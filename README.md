@@ -14,4 +14,4 @@ NIWA's python library to process SLOCUM glider data, incorporating pre-existing 
 - [pygmt](https://github.com/GenericMappingTools/pygmt)
 - [utm](https://github.com/Turbo87/utm)
 - [distinctipy](https://github.com/alan-turing-institute/distinctipy)
-- [colormap](https://github.com/cokelaer/colormap)
+- [colormap](https://github.com/mjziebarth/gmt-python-extensions/blob/master/gmt_extensions/colormap.py)
