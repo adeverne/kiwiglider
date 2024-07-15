@@ -10,6 +10,7 @@ NIWA's python library to process SLOCUM glider data, incorporating pre-existing 
 - [openpyxl](https://github.com/theorchard/openpyxl)
 - [palettable](https://github.com/jiffyclub/palettable)
 - [compliance-checker](https://github.com/ioos/compliance-checker)
+- [cc-plugin-glider](https://github.com/ioos/cc-plugin-glider)
 - [pocean-core](https://github.com/pyoceans/pocean-core)
 - [pygmt](https://github.com/GenericMappingTools/pygmt)
 - [utm](https://github.com/Turbo87/utm)
