@@ -1357,7 +1357,7 @@ class DeploymentNetCDF():
         pygmt.makecpt(cmap=temporary_cpt(palette='colorbrewer.sequential.Blues_9'),series=z_levels)
         fig.grdimage(
             region=f'{min_lon}/{min_lat}/{max_lon}/{max_lat}+r',projection=f'U{zone}/10.25',frame=['wEsN','af'],
-            grid='GB_bathy1m.nc',cmap=True
+            grid='GB_bathy5m.nc',cmap=True
         )
         fig.coast(land='white',shorelines=True)
         pygmt.makecpt(cmap=temporary_cpt(palette='cmocean.sequential.Amp_20'),series=[min_time,max_time])
@@ -1373,7 +1373,7 @@ class DeploymentNetCDF():
         pygmt.makecpt(cmap=temporary_cpt(palette='colorbrewer.sequential.Blues_9'),series=z_levels)
         fig.grdimage(
             region='g',projection=f'G{avg_lon}/{avg_lat}/10/3',frame='g10',
-            grid='GB_bathy5m.nc',cmap=True
+            grid='GB_bathy10m.nc',cmap=True
         )
         fig.coast(land='white',shorelines=True)
         fig.plot(
