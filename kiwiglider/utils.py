@@ -186,13 +186,12 @@ class DeploymentYAML():
 
         #initialize with static metadata
         self.metadata = {
-            'Conventions':'CF-1.6',
-            'Metadata_Conventions':'CF-1.6, Unidata Dataset Discovery v1.0',
+            'Conventions':'CF-1.11',
+            'Metadata_Conventions':'CF-1.11, Unidata Dataset Discovery v1.0',
             'contributor_role_vocabulary':'http://vocab.nerc.ac.uk/search_nvs/W08/',
             'comment':'" "',
             'creator_url':'" "',
             'format_version':'IOOS_Glider_NetCDF_v2.0.nc',
-            # 'glider_instrument_name':'slocum',
             'keywords':
                 'Water-based Platforms > Uncrewed Vehicles > Subsurface > Seaglider, '+
                 'Oceans > Marine Sediments > Turbidity, '+
@@ -210,7 +209,7 @@ class DeploymentYAML():
             'publisher_url':'" "',
             'references':'" "',
             'source':'Observational data from a profiling glider',
-            'standard_name_vocabulary':'Standard Name Table (v73, 23 June 2020)',
+            'standard_name_vocabulary':'Standard Name Table (v85, 21 May 2024)',
             'summary':'This dataset contains physical oceanographic measurements of temperature, conductivity, salinity, density and estimates of depth-average currents.',
         }
 
@@ -362,8 +361,7 @@ class DeploymentYAML():
                 'standard_name': 'time',
                 'calendar':      'gregorian',
                 'units':         'seconds since 1970-01-01T00:00:00Z',
-                'observation_type': 'measured',
-                # 'ancillary_variables': '" "'
+                'observation_type': 'measured'
             },
             'latitude':{
                 'source':  'm_gps_lat',
@@ -376,8 +374,7 @@ class DeploymentYAML():
                 'reference':    'WGS84',
                 'valid_max':    90.0,
                 'valid_min':    -90.0,
-                'coordinate_reference_frame':  'urn:ogc:crs:EPSG::4326',
-                # 'ancillary_variables': ' lat_qc lat_qartod_location_test '
+                'coordinate_reference_frame':  'urn:ogc:crs:EPSG::4326'
             },
             'longitude':{
                 'source':  'm_gps_lon',
@@ -390,29 +387,25 @@ class DeploymentYAML():
                 'reference':    'WGS84',
                 'valid_max':    180.0,
                 'valid_min':    -180.0,
-                'coordinate_reference_frame':  'urn:ogc:crs:EPSG::4326',
-                # 'ancillary_variables': ' lon_qc lon_qartod_location_test '
+                'coordinate_reference_frame':  'urn:ogc:crs:EPSG::4326'
             },
             'heading':{
                 'source':  'm_heading',
                 'long_name':    'Glider Heading Angle',
                 'standard_name': 'platform_orientation',
-                'units':        'rad',
-                # 'ancillary_variables': '" "'
+                'units':        'rad'
             },
             'pitch':{
                 'source':  'm_pitch',
                 'long_name':    'Glider Pitch Angle',
                 'standard_name': 'platform_pitch_angle',
-                'units':        'rad',
-                # 'ancillary_variables': '" "'
+                'units':        'rad'
             },
             'roll':{
                 'source':  'm_roll',
                 'long_name':    'Glider Roll Angle',
                 'standard_name': 'platform_roll_angle',
-                'units':        'rad',
-                # 'ancillary_variables': '" "'
+                'units':        'rad'
             },
             'conductivity':{
                 'source':  'sci_water_cond',
@@ -420,13 +413,12 @@ class DeploymentYAML():
                 'standard_name': 'sea_water_electrical_conductivity',
                 'units':        'S m-1',
                 'instrument':    'instrument_ctd',
-                'valid_min':    0.,
-                'valid_max':    10.,
+                'valid_min':    0.0,
+                'valid_max':    10.0,
                 'observation_type': 'measured',
                 'accuracy':      0.0003,
                 'precision':     0.0001,
-                'resolution':    0.00002,
-                # 'ancillary_variables': ' conductivity_qc conductivity_qartod_climatology_test conductivity_qartod_gross_range_test '
+                'resolution':    0.00002
             },
             'temperature':{
                 'source':  'sci_water_temp',
@@ -439,8 +431,7 @@ class DeploymentYAML():
                 'observation_type': 'measured',
                 'accuracy':      0.002,
                 'precision':     0.001,
-                'resolution':    0.0002,
-                # 'ancillary_variables': ' temperature_qc temperature_qartod_climatology_test temperature_qartod_gross_range_test '
+                'resolution':    0.0002
             },
             'pressure':{
                 'source':  'sci_water_pressure',
@@ -457,22 +448,19 @@ class DeploymentYAML():
                 'accuracy':         1.0,
                 'precision':        2.0,
                 'resolution':       0.02,
-                'comment':          'ctd pressure sensor',
-                # 'ancillary_variables': ' pressure_qc '
+                'comment':          'ctd pressure sensor'
             },
             'water_velocity_eastward':{
                 'source':    'm_water_vx',
                 'long_name':      'Depth-Averaged Eastward Sea Water Velocity',
                 'standard_name':  'barotropic_eastward_sea_water_velocity',
-                'units':          'm s-1',
-                # 'ancillary_variables': '" "'
+                'units':          'm s-1'
             },
             'water_velocity_northward':{
                 'source':    'm_water_vy',
                 'long_name':      'Depth-Averaged Northward Sea Water Velocity',
                 'standard_name':  'barotropic_northward_sea_water_velocity',
-                'units':          'm s-1',
-                # 'ancillary_variables': '" "'
+                'units':          'm s-1'
             }
         }
     
@@ -485,8 +473,7 @@ class DeploymentYAML():
                 'units':        'mg m-3',
                 'valid_min':    0.0,
                 'valid_max':    50.0,
-                'resolution':   0.025,
-                # 'ancillary_variables': '" "'
+                'resolution':   0.025
             })
             self._add_netcdf_variable('cdom',{
                 'source':  'sci_flbbcd_cdom_units',
@@ -494,8 +481,7 @@ class DeploymentYAML():
                 'units':        'ppb',
                 'valid_min':    0.0,
                 'valid_max':    375.0,
-                'resolution':   0.184,
-                # 'ancillary_variables': '" "'
+                'resolution':   0.184
             })
             self._add_netcdf_variable('backscatter_700',{
                 'source':  'sci_flbbcd_bb_units',
@@ -503,8 +489,7 @@ class DeploymentYAML():
                 'units':         "1",
                 'valid_min':    0.0,
                 'valid_max':    5.0,
-                'resolution':   0.003,
-                # 'ancillary_variables': '" "'
+                'resolution':   0.003
             })
         if self.excel_metadata['oxy_installed']:
             self._add_netcdf_variable('oxygen_concentration',{
@@ -515,8 +500,7 @@ class DeploymentYAML():
                 'valid_min':    0.0,
                 'valid_max':    500.0,
                 'accuracy':     8.0,
-                'resolution':   1.0,
-                # 'ancillary_variables': ' oxygen_concentration_qartod_climatology_test oxygen_concentration_qartod_gross_range_test '
+                'resolution':   1.0
             })
         if self.excel_metadata['par_installed']:
             self._add_netcdf_variable('par',{
@@ -525,8 +509,7 @@ class DeploymentYAML():
                 'standard_name': 'downwelling_photosynthetic_photon_spherical_irradiance_in_sea_water',
                 'units':        'umol m-2 s-1',
                 'valid_min':     0.0000000014,
-                'valid_max':     0.00005,
-                # 'ancillary_variables': '" "'
+                'valid_max':     0.00005
             })
         if self.excel_metadata['bb3_installed']:
             self._add_netcdf_variable('backscatter_470',{
@@ -535,8 +518,7 @@ class DeploymentYAML():
                 'units':         "1",
                 'valid_min':    0.0,
                 'valid_max':    5.0,
-                'resolution':   0.003,
-                # 'ancillary_variables': '" "'
+                'resolution':   0.003
             })
             self._add_netcdf_variable('backscatter_532',{
                 'source':  'sci_bb3slo_b532_scaled',
@@ -544,8 +526,7 @@ class DeploymentYAML():
                 'units':         "1",
                 'valid_min':    0.0,
                 'valid_max':    5.0,
-                'resolution':   0.003,
-                # 'ancillary_variables': '" "'
+                'resolution':   0.003
             })
             self._add_netcdf_variable('backscatter_660',{
                 'source':  'sci_bb3slo_b660_scaled',
@@ -553,8 +534,7 @@ class DeploymentYAML():
                 'units':         "1",
                 'valid_min':    0.0,
                 'valid_max':    5.0,
-                'resolution':   0.003,
-                # 'ancillary_variables': '" "'
+                'resolution':   0.003
             })
         if self.excel_metadata['lisst_installed']:
             self._add_netcdf_variable('total_volume_concentration',{
@@ -563,16 +543,14 @@ class DeploymentYAML():
                 'units':         'uL L-1',
                 'valid_min':    0.5,
                 'valid_max':    700,
-                'resolution':   0.1,
-                # 'ancillary_variables': '" "'
+                'resolution':   0.1
             })
             self._add_netcdf_variable('mean_size',{
                 'source':  'sci_lisst_meansize',
                 'long_name':    'Mean Particle Size',
                 'units':         'um',
                 'valid_min':    1.0,
-                'valid_max':    500,
-                # 'ancillary_variables': '" "'
+                'valid_max':    500
             })
             self._add_netcdf_variable('beam_attenuation',{
                 'source':  'sci_lisst_beamc',
@@ -580,8 +558,7 @@ class DeploymentYAML():
                 'units':         'm-1',
                 'valid_min':    0.3,
                 'valid_max':    0.99,
-                'resolution':   0.1,
-                # 'ancillary_variables': '" "'
+                'resolution':   0.1
             })
             
         #add from user input (overwrite as necessary)
@@ -603,35 +580,29 @@ class DeploymentYAML():
             'profile_id':{
                 'comment':'Sequential profile number within the trajectory.  This value is unique in each file that is part of a single trajectory/deployment.',
                 'long_name':'Profile ID',
-                'valid_max':2147483647.0,
-                'valid_min':1.0,
-                # 'ancillary_variables': '" "',
-                '_FillValue':-999.0
+                'valid_max':2147483647,
+                'valid_min':1
             },
             'profile_time':{
                 'comment':           'Timestamp corresponding to the mid-point of the profile',
                 'long_name':         'Profile Center Time',
                 'observation_type':  'calculated',
                 'platform':          'platform',
-                'standard_name':     'time',
-                # 'ancillary_variables': '" "',
-                '_FillValue':        -999
+                'standard_name':     'time'
             },
             'profile_time_start':{
                 'comment':           'Timestamp corresponding to the start of the profile',
                 'long_name':         'Profile Start Time',
                 'observation_type':  'calculated',
                 'platform':          'platform',
-                'standard_name':     'time',
-                # 'ancillary_variables': '" "'
+                'standard_name':     'time'
             },
             'profile_time_end':{
                 'comment':           'Timestamp corresponding to the end of the profile',
                 'long_name':         'Profile End Time',
                 'observation_type':  'calculated',
                 'platform':          'platform',
-                'standard_name':     'time',
-                # 'ancillary_variables': '" "'
+                'standard_name':     'time'
             },
             'profile_lat':{
                 'comment':           'Value is interpolated to provide an estimate of the latitude at the mid-point of the profile',
@@ -641,9 +612,7 @@ class DeploymentYAML():
                 'standard_name':     'latitude',
                 'units':             'degrees_north',
                 'valid_max':         90.0,
-                'valid_min':         -90.0,
-                # 'ancillary_variables': '" "',
-                '_FillValue':        -999.0
+                'valid_min':         -90.0
             },
             'profile_lon':{
                 'comment':           'Value is interpolated to provide an estimate of the longitude at the mid-point of the profile',
@@ -653,9 +622,7 @@ class DeploymentYAML():
                 'standard_name':     'longitude',
                 'units':             'degrees_east',
                 'valid_max':         180.0,
-                'valid_min':         -180.0,
-                # 'ancillary_variables': '" "',
-                '_FillValue':        -999.0
+                'valid_min':         -180.0
             },
             'u':{
                 'comment':  'The depth-averaged current is an estimate of the net current measured while the glider is underwater.  The value is calculated over the entire underwater segment, which may consist of 1 or more dives.',
@@ -665,9 +632,7 @@ class DeploymentYAML():
                 'standard_name':     'eastward_sea_water_velocity',
                 'units':             'm s-1',
                 'valid_max':         10.0,
-                'valid_min':         -10.0,
-                # 'ancillary_variables': '" "',
-                '_FillValue':        -999.0
+                'valid_min':         -10.0
             },
             'v':{
                 'comment':  'The depth-averaged current is an estimate of the net current measured while the glider is underwater.  The value is calculated over the entire underwater segment, which may consist of 1 or more dives.',
@@ -677,9 +642,7 @@ class DeploymentYAML():
                 'standard_name':     'northward_sea_water_velocity',
                 'units':             'm s-1',
                 'valid_max':         10.0,
-                'valid_min':         -10.0,
-                # 'ancillary_variables': '" "',
-                '_FillValue':        -999.0
+                'valid_min':         -10.0
             },
             'lon_uv':{
                 'comment':           'The depth-averaged current is an estimate of the net current measured while the glider is underwater.  The value is calculated over the entire underwater segment, which may consist of 1 or more dives.',
@@ -689,8 +652,7 @@ class DeploymentYAML():
                 'standard_name':     'longitude',
                 'units':             'degrees_east',
                 'valid_max':         180.0,
-                'valid_min':         -180.0,
-                # 'ancillary_variables': '" "'
+                'valid_min':         -180.0
             },
             'lat_uv':{
                 'comment':           'The depth-averaged current is an estimate of the net current measured while the glider is underwater.  The value is calculated over the entire underwater segment, which may consist of 1 or more dives.',
@@ -700,8 +662,7 @@ class DeploymentYAML():
                 'standard_name':     'latitude',
                 'units':             'degrees_north',
                 'valid_max':         90.0,
-                'valid_min':         -90.0,
-                # 'ancillary_variables': '" "'
+                'valid_min':         -90.0
             },
             'time_uv':{
                 'comment':          'The depth-averaged current is an estimate of the net current measured while the glider is underwater.  The value is calculated over the entire underwater segment, which may consist of 1 or more dives.',
@@ -709,8 +670,7 @@ class DeploymentYAML():
                 'standard_name':    'time',
                 'calendar':         'gregorian',
                 'units':            'seconds since 1970-01-01T00:00:00Z',
-                'observation_type': 'calculated',
-                # 'ancillary_variables': '" "'
+                'observation_type': 'calculated'
             },
             'instrument_ctd':{
                 'comment':    'pumped CTD',
@@ -1190,7 +1150,7 @@ class DeploymentNetCDF():
         filenames are relative to main_directory
         map_bounds in [minimum latitude, maximum latitude, minimum longitude, maximum longitude] form
         map_bounds=None will define based on data
-        specify 3 subplots with palettable colortables
+        specify 3 subplots, in order of top to bottom, with palettable colortables
         """
         timeseries_file = join_path(self.main_directory,timeseries_file)
         output_file = join_path(self.main_directory,output_file)
@@ -1281,7 +1241,7 @@ class DeploymentNetCDF():
         # #create summary page
         #initialize
         fig = pygmt.Figure()
-        #define common parameters
+        #define gmt processing debug output level based on user's selected log level
         match _log.root.level:
             case 10:
                 #DEBUG
@@ -1298,6 +1258,7 @@ class DeploymentNetCDF():
             case _:
                 #everything else
                 log_level = 'w'
+        #define gmt setup
         pygmt.config(
             PS_MEDIA='a4',FONT_ANNOT_PRIMARY=8,FONT_LABEL=8,PROJ_LENGTH_UNIT='c',
             MAP_FRAME_TYPE='plain',MAP_TICK_PEN='black',MAP_FRAME_PEN='thinnest,black',
