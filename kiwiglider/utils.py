@@ -986,6 +986,11 @@ class DeploymentNetCDF():
         #make sure output directory exists
         if not exists(self.l1timeseries_directory):
             makedirs(self.l1timeseries_directory)
+        
+        #make sure already have an L0
+        if not hasattr(self,'l0timeseries_outname'):
+            raise AttributeError('No L0 timeseries file exists. Must run DeploymentNetCDF.L0 before DeploymentNetCDF.L1')
+
         #create output name based on L0 name
         self.l1timeseries_outname = join_path(self.l1timeseries_directory,basename(self.l0timeseries_outname))
         _log.info(f'Creating L1 single timeseries NetCDF {self.l1timeseries_outname}')
