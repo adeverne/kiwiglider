@@ -1104,6 +1104,7 @@ class DeploymentNetCDF():
         """
         use the IOOS compliance checker on profile files produced in L0 or L1
         filenames are relative to main_directory
+        only do ones that haven't been checked
         """
         profile_directory = join_path(self.main_directory,profile_directory)
         _log.info(f'Checking profile NetCDFs in {profile_directory}')
@@ -1130,21 +1131,26 @@ class DeploymentNetCDF():
 
         #run compliance checker for each file
         for f in file_names:
+            #make true file name
             f = f.split('.')[0]
             f = join_path(profile_directory,f)
-            _log.debug(f'Checking {f}.nc')
-            passed,_ = checker.run_checker(
-                ds_loc=f+'.nc',
-                output_filename=f+'_report.txt',
-                checker_names=['gliderdac'],
-                verbose=log_level,
-                criteria='normal'
-            )
-            if passed:
-                isnot = 'is'
-            else:
-                isnot = 'is not'
-            _log.info(f'{f}.nc {isnot} IOOS GliderDAC compliant. See {f}_report.txt for details.')
+            #if report doesn't already exist
+            if not exists(f+'_report.txt'):
+                _log.debug(f'Checking {f}.nc')
+                #check
+                passed,_ = checker.run_checker(
+                    ds_loc=f+'.nc',
+                    output_filename=f+'_report.txt',
+                    checker_names=['gliderdac'],
+                    verbose=log_level,
+                    criteria='normal'
+                )
+                #output
+                if passed:
+                    isnot = 'is'
+                else:
+                    isnot = 'is not'
+                _log.info(f'{f}.nc {isnot} IOOS GliderDAC compliant. See {f}_report.txt for details.')
         
     def create_summary(self,timeseries_file,output_file,author='Anonymous',extra_text=None,map_bounds=None,
                        plots=({'source':'temperature','cmap':'cmocean.sequential.Thermal_20'},
