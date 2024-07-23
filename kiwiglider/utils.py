@@ -1105,6 +1105,7 @@ class DeploymentNetCDF():
         use the IOOS compliance checker on profile files produced in L0 or L1
         filenames are relative to main_directory
         only do ones that haven't been checked
+        outputs passing state of each file checked
         """
         profile_directory = join_path(self.main_directory,profile_directory)
         _log.info(f'Checking profile NetCDFs in {profile_directory}')
@@ -1130,6 +1131,7 @@ class DeploymentNetCDF():
         checker = ComplianceChecker()
 
         #run compliance checker for each file
+        passed = [False] * len(file_names)
         for f in file_names:
             #make true file name
             f = f.split('.')[0]
@@ -1151,6 +1153,9 @@ class DeploymentNetCDF():
                 else:
                     isnot = 'is not'
                 _log.info(f'{f}.nc {isnot} IOOS GliderDAC compliant. See {f}_report.txt for details.')
+        
+        #output
+        return passed,file_names
         
     def create_summary(self,timeseries_file,output_file,author='Anonymous',extra_text=None,map_bounds=None,
                        plots=({'source':'temperature','cmap':'cmocean.sequential.Thermal_20'},
