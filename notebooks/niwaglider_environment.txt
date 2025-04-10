@@ -1,0 +1,27 @@
+name: glidertools
+channels:
+  - conda-forge
+dependencies:
+  - cmocean
+  - cvxpy
+  - geopy
+  - gstools
+  - gsw
+  - ipython
+  - jupyter
+  - netcdf4
+  - numexpr
+  - numpy
+  - pandas
+  - pip
+  - pykrige
+  - scikit-learn
+  - scipy
+  - skyfield
+  - tqdm
+  - xarray==2024.11.0
+  - openpyxl
+  - ioos_qc
+  - matplotlib
+  - pyglider
+prefix: /home/kakapo/miniconda3/envs/glidertools
