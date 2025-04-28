@@ -1,0 +1,18 @@
+[project]
+name = "kiwiglider"
+version = "0.1.0"
+description = "Python package to fill the gap in post-processing Slocum glider data from raw binary (as done in pyglider) to higher-level processing (glidertools)."
+readme = "README.md"
+authors = [
+    { name = "Alain de Verneil", email = "alain.deverneil@niwa.co.nz" }
+]
+requires-python = ">3.8"
+dependencies = []
+
+[project.scripts]
+example-pkg = "example_pkg:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
