@@ -2,6 +2,7 @@
 
 import xarray as xr
 
+
 def step00(procDir: str = ".", verbose: bool = True):
     """
     function step00(procDir, verbose)
@@ -23,7 +24,8 @@ def step00(procDir: str = ".", verbose: bool = True):
     # Navigate to procDir, get list of sub-directories to navigate...
     dirConts = sorted(glob(procDir))
     subDirs = []
-    #[subDirs.append(x) if os]
+#    #[subDirs.append(x) if os]
+
 
 def step01(procDir: str = ".", verbose: bool = True):
     """
@@ -36,6 +38,7 @@ def step01(procDir: str = ".", verbose: bool = True):
         Load raw data loaded from DBD and EBD files detected in step00. Saves
         data in xarray Dataset as L0 for faster loading later.
     """
+
 
 def step02telemetry(verbose: bool = True):
     """
