@@ -147,7 +147,36 @@ def step_00(rootDir: str, verbose: bool = True) -> None:
               "been copied and have upper-case extension names.")
 
 
-def step01(rootDir: str = ".", verbose: bool = True):
+def setupcheck(rootDir: str, verbose: bool = True) -> tuple:
+    """
+    function setupcheck(rootDir, verbose)
+
+    Input:
+        rootDir - Path to root processing directory
+        verbose - Logical switch to print detailed status.
+
+    Output:
+
+    Description:
+        Function invoked at beginning of steps to double-check that the
+        user-provided directory is a good root directory for processing
+        as defined in kiwiglider. Returns tuple with raw and cache paths.
+    """
+    import os
+    if not os.path.exists(os.path.join(rootDir, "Raw")):
+        raise Exception(f"Now Raw directory in {rootDir}, either " +
+                        "directory or run step_00 first.")
+    else:
+        rawDir = os.path.join(rootDir, "Raw")
+    if not os.path.exists(os.path.join(rawDir, "Cache")):
+        raise Exception("Raw directory found, but not Cache. " +
+                        "Please re-run step_00")
+    else:
+        cacheDir = os.path.join(rawDir, "Cache")
+    return (rawDir, cacheDir)
+
+
+def step01(rootDir: str, verbose: bool = True) -> None:
     """
     function step01(procDir, verbose)
     Input:
@@ -159,6 +188,77 @@ def step01(rootDir: str = ".", verbose: bool = True):
         data in xarray Dataset as L0 for faster loading later. Variables chosen
         to be loaded can be found in included "XXXXXX.txt"
     """
+    # Import packages, including attempt of dbdreader...
+    from glob import glob
+    import os
+    import sys
+    import numpy as np
+    try:
+        import dbdreader
+        have_dbd = True
+    except ImportError:
+        print("Cannot import dbdreader, will use pyglider utilities instead.")
+        have_dbd = False
+        from pyglider import slocum
+
+    # Run setup check
+    rawDir, cacheDir = setupcheck(rootDir)
+
+    # Check for EBD/DBD and .CAC files in Raw and Raw/Cache (if they exist)...
+    eList = sorted(glob(os.path.join(rawDir, "*.EBD")))
+    dList = sorted(glob(os.path.join(rawDir, "*.DBD")))
+    cList = sorted(glob(os.path.join(cacheDir, "*.CAC")))
+    if eList:
+        if verbose:
+            print("Found EBD files...")
+        if dList:
+            if verbose:
+                print("Found DBD files...")
+            if cList:
+                if verbose:
+                    print("Found CAC files...")
+            else:
+                raise Exception("Found EBD, DBD but no CAC files, " +
+                                "make sure they are there or run " +
+                                "step_00 again.")
+        else:
+            raise Exception("Found EBD but not DBD files, make " +
+                            "sure they are there or run step_00 again.")
+    else:
+        raise Exception("Could not find EBD files, make sure " +
+                        "they are there or run step_00 again.")
+
+    # Get list of unique variables from EBD and DBD raw files...
+    varList = []
+    unitList = []
+    if have_dbd:
+        if verbose:
+            print("Using DBDreader, creating MultiDBD object...")
+        mDBD = dbdreader.MultiDBD(os.path.join(rawDir, "*[DE]BD"),
+                                  cacheDir=cacheDir)
+        varList = mDBD.parameterUnits.keys()
+        unitList = mDBD.parameterUnits.values()
+    else:
+        if verbose:
+            print("Cycling through files to get variables..." +
+                  " may take a while.")
+        for f in np.union1d(dList, eList):
+            try:
+                meta = slocum.dbd_get_meta(f, cachedir=cacheDir)
+                for entry in meta[0]['activeSensorList']:
+                    # If new, add to varList...
+                    if entry['name'] not in varList:
+                        varList.append(entry['name'])
+                    if entry['unit'] not in unitList:
+                        unitList.append(entry['unit'])
+            except Exception:
+                e = sys.exc_info()[0]
+                print(f"Error: {e}")
+                print(f"Cannot load metadata for file {f}")
+                print("Moving on to next file...")
+    # Match list of variables to standard variables...
+    # Check for telemetry (m_lon/m_lat, and m_gps_lon/m_gps_lat)
+    # Check for CTD variables...
 
 
 def step02telemetry(verbose: bool = True):
@@ -169,6 +269,18 @@ def step02telemetry(verbose: bool = True):
         verbose - Logical switch to print detailed status
     Output:
 
+
+    Description:
+    """
+
+
+def step03defineCast(verbose: bool = True):
+    """
+    function step03_defineCast(verbose): -> None
+
+    Input:
+        verbose - Logical switch
+    Output:
 
     Description:
     """

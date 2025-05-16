@@ -37,8 +37,13 @@ This structure reflects earlier packages, such as the SOCIB and GEOMAR toolboxes
 3. Combine approaches of multiple packages to (inshallah) provide more robust post-processing. In particular, we want to replicate the oxygen processing and flight model functionality provided by the GEOMAR toolbox.
 4. Intermediate data will be in an xarray object that maintains metadata, allows for easy export to netCDF/Zarr, and can dovetail into the glidertools package.
 
-#### April 10, 2025
+## April 2025
+
+### April 10, 2025
 
 Note: added jupyter notebook with post-processing journal.
 
+### April 29, 2025
 
+Re-organized the directory to mirror python packages as set up by [UV](https://docs.astral.sh/uv/).
+Fleshed out step_00 which copies raw data to a single directory for processing. Will begin step_01 to load raw data, preferably using dbdreader but also pyglider's utilities.
