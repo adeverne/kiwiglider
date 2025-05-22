@@ -61,22 +61,25 @@ def step_00(rootDir: str, verbose: bool = True) -> None:
     if verbose:
         print(f"About to start navigating through {rootDir} ...")
     for root, _, files in os.walk(rootDir):
-        for filename in files:
-            # Check to see if ebd...
-            if os.path.splitext(filename)[1] in [".EBD", ".ebd"]:
-                nEBD += 1
-                if root not in ebdDirs:
-                    ebdDirs.append(root)
-            # Check to see if dbd...
-            if os.path.splitext(filename)[1] in [".DBD", ".dbd"]:
-                nDBD += 1
-                if root not in dbdDirs:
-                    dbdDirs.append(root)
-            # Check for CAC cache files...
-            if os.path.splitext(filename)[1] in [".CAC", ".cac"]:
-                nCAC += 1
-                if root not in cacDirs:
-                    cacDirs.append(root)
+        # Skip the Raw directory...
+        if ((root != os.path.join(rootDir, "Raw")) &
+           (root != os.path.join(rootDir, "Raw", "Cache"))):
+            for filename in files:
+                # Check to see if ebd...
+                if os.path.splitext(filename)[1] in [".EBD", ".ebd"]:
+                    nEBD += 1
+                    if root not in ebdDirs:
+                        ebdDirs.append(root)
+                # Check to see if dbd...
+                if os.path.splitext(filename)[1] in [".DBD", ".dbd"]:
+                    nDBD += 1
+                    if root not in dbdDirs:
+                        dbdDirs.append(root)
+                # Check for CAC cache files...
+                if os.path.splitext(filename)[1] in [".CAC", ".cac"]:
+                    nCAC += 1
+                    if root not in cacDirs:
+                        cacDirs.append(root)
     if verbose:
         print(f"Done navigating {rootDir}")
         print(f"Found {len(ebdDirs):02d} directories with a " +
@@ -94,35 +97,42 @@ def step_00(rootDir: str, verbose: bool = True) -> None:
     # with CAC files in sub-directory Cache/, and make extensions upper-case
     # Check to see if copies already exist....
     e1 = glob(os.path.join(rootDir, "Raw", "*.EBD"))
+    e1name = [x.split('/')[-1] for x in e1]
     e2 = glob(os.path.join(rootDir, "Raw", "*.ebd"))
+    e2name = [x.split('/')[-1] for x in e2]
+
     if len(e1) + len(e2) != nEBD:
         if verbose:
-            print(f"Found {len(e1) + len(e2)} files in Raw, but detected " +
-                  f"{nEBD} files in total... will copy new files.")
+            print(f"Found {len(e1) + len(e2)} ebd files in Raw, but " +
+                  f"detected {nEBD} files in total... will copy new files.")
         for edir in ebdDirs:
             for root, _, files in os.walk(edir):
                 for filename in files:
                     if os.path.splitext(filename)[1] in [".EBD", ".ebd"]:
-                        if (filename not in e1) & (filename not in e2):
+                        if (filename not in e1name) & (filename not in e2name):
                             shutil.copyfile(os.path.join(root, filename),
                                             os.path.join(rootDir, "Raw",
                                                          filename))
     d1 = glob(os.path.join(rootDir, "Raw", "*.DBD"))
+    d1name = [x.split('/')[-1] for x in d1]
     d2 = glob(os.path.join(rootDir, "Raw", "*.dbd"))
+    d2name = [x.split('/')[-1] for x in d2]
     if len(d1)+len(d2) != nDBD:
         if verbose:
-            print(f"Found {len(d1) + len(d2)} files in Raw, but detected " +
-                  f"{nDBD} files in total... will copy new files.")
+            print(f"Found {len(d1) + len(d2)} dbd files in Raw, but " +
+                  f"detected {nDBD} files in total... will copy new files.")
         for ddir in dbdDirs:
             for root, _, files in os.walk(ddir):
                 for filename in files:
                     if os.path.splitext(filename)[1] in [".DBD", ".dbd"]:
-                        if (filename not in d1) & (filename not in d2):
+                        if (filename not in d1name) & (filename not in d2name):
                             shutil.copyfile(os.path.join(root, filename),
                                             os.path.join(rootDir, "Raw",
                                                          filename))
     c1 = glob(os.path.join(rootDir, "Raw", "Cache", "*.CAC"))
+    c1name = [x.split('/')[-1] for x in c1]
     c2 = glob(os.path.join(rootDir, "Raw", "Cache", "*.cac"))
+    c2name = [x.split('/')[-1] for x in c2]
     if len(c1)+len(c2) != nCAC:
         if verbose:
             print(f"Found {len(c1) + len(c2)} cache files in Raw, but " +
@@ -131,7 +141,7 @@ def step_00(rootDir: str, verbose: bool = True) -> None:
             for root, _, files in os.walk(cdir):
                 for filename in files:
                     if os.path.splitext(filename)[1] in [".CAC", ".cac"]:
-                        if (filename not in c1) & (filename not in c1):
+                        if (filename not in c1name) & (filename not in c2name):
                             shutil.copyfile(os.path.join(root, filename),
                                             os.path.join(rootDir, "Raw",
                                                          "Cache", filename))
@@ -176,7 +186,7 @@ def setupcheck(rootDir: str, verbose: bool = True) -> tuple:
     return (rawDir, cacheDir)
 
 
-def step01(rootDir: str, verbose: bool = True) -> None:
+def step_01(rootDir: str, verbose: bool = True) -> None:
     """
     function step01(procDir, verbose)
     Input:
@@ -193,8 +203,10 @@ def step01(rootDir: str, verbose: bool = True) -> None:
     import os
     import sys
     import numpy as np
+    import xarray as xr
     try:
         import dbdreader
+        from dbdreader import DbdError
         have_dbd = True
     except ImportError:
         print("Cannot import dbdreader, will use pyglider utilities instead.")
@@ -210,13 +222,13 @@ def step01(rootDir: str, verbose: bool = True) -> None:
     cList = sorted(glob(os.path.join(cacheDir, "*.CAC")))
     if eList:
         if verbose:
-            print("Found EBD files...")
+            print(f"Found {len(eList)} EBD files...")
         if dList:
             if verbose:
-                print("Found DBD files...")
+                print(f"Found {len(dList)} DBD files...")
             if cList:
                 if verbose:
-                    print("Found CAC files...")
+                    print(f"Found {len(cList)} CAC files...")
             else:
                 raise Exception("Found EBD, DBD but no CAC files, " +
                                 "make sure they are there or run " +
@@ -256,9 +268,73 @@ def step01(rootDir: str, verbose: bool = True) -> None:
                 print(f"Error: {e}")
                 print(f"Cannot load metadata for file {f}")
                 print("Moving on to next file...")
-    # Match list of variables to standard variables...
-    # Check for telemetry (m_lon/m_lat, and m_gps_lon/m_gps_lat)
-    # Check for CTD variables...
+
+    # Now, load the raw timeseries data into xarray datasets and save as
+    # netCDF files, one each for machine and science computers.
+    if have_dbd:
+        # Grab all the machine variables, first try to get timestamps
+        if np.where([x == 'm_present_time' for x in varList])[0].size == 0:
+            raise Exception("Did not find m_present_time in variable list...")
+        else:
+            _, mTimeStamps = mDBD.get('m_present_time')
+            mTimeStamps = np.sort(mTimeStamps)
+            nTimeStamps = len(mTimeStamps)
+            if verbose:
+                print(f"Loaded machine time, {nTimeStamps} observations...")
+        # Now load the rest of the machine data
+        machineList = ['m_lon', 'm_lat', 'm_gps_lon', 'm_gps_lat',
+                       'm_gps_invalid_lon', 'm_gps_invalid_lat',
+                       'm_gps_toofar_lon', 'm_gps_toofar_lat',
+                       'm_gps_ignored_lon', 'm_gps_ignored_lat',
+                       'm_depth', 'm_gps_utc_year', 'm_gps_utc_month',
+                       'm_gps_utc_day', 'm_gps_utc_hour',
+                       'm_gps_utc_minute', 'm_gps_utc_second',
+                       'm_tot_num_inflections']
+        machineUnits = ['degree_East', 'degree_North',
+                        'degree_East', 'degree_North',
+                        'degree_East', 'degree_North',
+                        'degree_East', 'degree_North',
+                        'm', 'year', 'month', 'day', 'hour',
+                        'minute', 'second', '_']
+        for mName in machineList:
+            if np.where([x == mName for x in varList])[0].size > 0:
+                if verbose:
+                    print("Found variable {mName} in list, trying to load...")
+                try:
+                    varTime, varVal = mDBD.get(mName)
+                except DbdError:
+                    print("Could not load {mName}...")
+                exec(f"{mName} = np.zeros((ntimeStamps,))*np.nan")
+                timeIdx = np.squeeze(np.asarray([np.where(mTimeStamps == x)[0]
+                                                for x in varTime]))
+                exec(f"{mName}[timeIdx] = varVal")
+                # Create Xarray DataArray from variable
+                exec(f"{mName}_DA = xr.DataArray({mName}," +
+                     "dims=['time'],coords=dict(time=mTimeStamps)," +
+                     f"attrs=dict(long_name='{machineName}'," +
+                     f"units='{machineUnits}',_FillValue='')")
+            else:
+                raise Exception("Did not find {mName} in found variables...")
+
+        _,mTime = mDBD.get('m_present_time')
+        nTimeStamps = len(mTime)
+        m_lon = np.ones((nTimeStamps,))*np.nan
+        m_lat = np.ones((nTimeStamps,))*np.nan
+        m_gps_lon = np.ones((nTimeStamps,))*np.nan
+        m_gps_lat = np.ones((nTimeStamps,))*np.nan
+        m_gps_invalid_lon = np.ones((nTimeStamps,))*np.nan
+        m_gps_invalid_lat = np.ones((nTimeStamps,))*np.nan
+        m_gps_toofar_lon = np.ones((nTimeStamps,))*np.nan
+        m_gps_toofar_lat = np.ones((nTimeStamps,))*np.nan
+        m_gps_ignored_lon = np.ones((nTimeStamps,))*np.nan
+        m_gps_ignored_lat = np.ones((nTimeStamps,))*np.nan
+
+        # Load the dead-reckoned lon/lat
+        mlonTime, mlon = mDBD.get("m_lon")
+        mlatTime, mlat = mDBD.get("m_lat")
+        print("Found m_lon, m_lat machine variables...")
+    # Check for CTD variables sci_water_*
+    # Check for "typical" extra science variables...
 
 
 def step02telemetry(verbose: bool = True):
@@ -271,6 +347,7 @@ def step02telemetry(verbose: bool = True):
 
 
     Description:
+        Function to do QC and merging of GPS lon/lat fixes with dead-reckoned lon/lat timeseries.
     """
 
 
@@ -283,4 +360,10 @@ def step03defineCast(verbose: bool = True):
     Output:
 
     Description:
+        Function to go through pressure timeseries and determine where casts begin/end.
+
     """
+
+def step04salinityQC(verbose: bool = True):
+    """
+    function step04_"""
