@@ -846,7 +846,7 @@ class DeploymentNetCDF():
     class with methods for making and reading NetCDFs in IOOS Glider DAC form
     """
 
-    def __init__(self, main_directory, binary_directory='raw', cache_directory='cache', deployment_yaml='deployment_metadata.yml'):
+    def __init__(self, main_directory, binary_directory='Raw', cache_directory=join_path('Raw','Cache'), deployment_yaml='deployment_metadata.yml'):
         """
         initialize class with directory and file pathnames
         all are relative to main_directory
@@ -859,7 +859,7 @@ class DeploymentNetCDF():
 
     def read_timeseries(self, timeseries_file):
         """
-        read a timeseries NetCDF created by L0 or L1
+        read a timeseries NetCDF created by make_L0 or make_L1
         filename is relative to main_directory
         """
         timeseries_file = join_path(self.main_directory, timeseries_file)
@@ -877,42 +877,30 @@ class DeploymentNetCDF():
         with xr.open_mfdataset(profile_directory) as ds:
             return ds
 
-    def make_L0(self, style=None, search=None, profile_filt_time=None, profile_min_time=None,
-                l0timeseries_directory='L0-timeseries', l0profile_directory='L0-profiles'):
+    def make_L0(self, style='Realtime', l0timeseries_directory='L0-timeseries', l0profile_directory='L0-profiles'):
         """
-        create the L0 timeseries and profile NetCDFs
+        create the L0 (read and interpolate according to PyGlider) timeseries and profile NetCDFs
+        directories are relative to class main_directory and specified style
         give l0profile_directory None or False to skip writing profile NetCDFs
         """
         #assign inputs
-        self.l0timeseries_directory = join_path(self.main_directory,l0timeseries_directory)
-        if l0profile_directory:
-            self.l0profile_directory = join_path(self.main_directory,l0profile_directory)
-        else:
-            self.l0profile_directory = l0profile_directory
-        match style:
-            case 'realtime':
+        self.style = style
+        match self.style:
+            case 'Realtime':
                 self.search = '*.[s|t]bd'
                 self.profile_filt_time = 20
                 self.profile_min_time = 60
-            case 'delayed':
+            case 'Delayed':
                 self.search = '*.[d|e]bd'
                 self.profile_filt_time = 100
                 self.profile_min_time = 300
-            case None:
-                if search is not None:
-                    self.search = search
-                else:
-                    raise KeyError('Must provide either "style" or "search","profile_filt_time","profile_min_time"')
-                if profile_filt_time is not None:
-                    self.profile_filt_time = profile_filt_time
-                else:
-                    raise KeyError('Must provide either "style" or "search","profile_filt_time","profile_min_time"')
-                if profile_min_time is not None:
-                    self.profile_min_time = profile_min_time
-                else:
-                    raise KeyError('Must provide either "style" or "search","profile_filt_time","profile_min_time"')
             case _:
-                raise ValueError('Input "style" must be "realtime", "delayed", or None')
+                raise ValueError('Input "style" must be "Realtime" or "Delayed"')
+        self.l0timeseries_directory = join_path(self.main_directory,self.style,l0timeseries_directory)
+        if l0profile_directory:
+            self.l0profile_directory = join_path(self.main_directory,self.style,l0profile_directory)
+        else:
+            self.l0profile_directory = l0profile_directory
 
         #turn binary *.*bd (file extension based on search) into a single timeseries netcdf file
         self.l0timeseries_outname = slocum.binary_to_timeseries(
@@ -927,23 +915,24 @@ class DeploymentNetCDF():
     
     def make_L1(self,l1timeseries_directory='L1-timeseries',l1profile_directory='L1-profiles'):
         """
-        create the L1 timeseries and profile NetCDFs
+        create the L1 (QARTOD tested) timeseries and profile NetCDFs
+        directories are relative to class main_directory and style
         give l1profile_directory None or False to skip writing profile NetCDFs
         """
+        #make sure already have an L0
+        if not hasattr(self,'l0timeseries_outname'):
+            raise AttributeError('No L0 timeseries file exists. Must run DeploymentNetCDF.L0 before DeploymentNetCDF.L1')
+        
         #assign inputs
-        self.l1timeseries_directory = join_path(self.main_directory,l1timeseries_directory)
+        self.l1timeseries_directory = join_path(self.main_directory,self.style,l1timeseries_directory)
         if l1profile_directory:
-            self.l1profile_directory = join_path(self.main_directory,l1profile_directory)
+            self.l1profile_directory = join_path(self.main_directory,self.style,l1profile_directory)
         else:
             self.l1profile_directory = l1profile_directory
 
         #make sure output directory exists
         if not exists(self.l1timeseries_directory):
             makedirs(self.l1timeseries_directory)
-        
-        #make sure already have an L0
-        if not hasattr(self,'l0timeseries_outname'):
-            raise AttributeError('No L0 timeseries file exists. Must run DeploymentNetCDF.L0 before DeploymentNetCDF.L1')
 
         #create output name based on L0 name
         self.l1timeseries_outname = join_path(self.l1timeseries_directory,basename(self.l0timeseries_outname))
@@ -1067,11 +1056,11 @@ class DeploymentNetCDF():
     def check_compliance(self,profile_directory='L1-profiles'):
         """
         use the IOOS compliance checker on profile files produced in L0 or L1 (defaults to L1)
-        filenames are relative to main_directory
+        filenames are relative to class main_directory and style
         only do ones that haven't been checked
         outputs name of each file checked and passing state (False if not passed or already evaluated)
         """
-        profile_directory = join_path(self.main_directory,profile_directory)
+        profile_directory = join_path(self.main_directory,self.style,profile_directory)
         _log.info(f'Checking profile NetCDFs in {profile_directory}')
 
         #define log level for checker verbosity
@@ -1129,14 +1118,14 @@ class DeploymentNetCDF():
                               {'source':'density','cmap':'cmocean.sequential.Dense_20'})):
         """
         output a summary page from a timeseries NetCDF file
-        filenames are relative to main_directory
+        filenames are relative to main_directory and style
         extra_text adds text on the same line as funding acknowledgement
         map_bounds in [minimum latitude, maximum latitude, minimum longitude, maximum longitude] form
         map_bounds=None will define based on data
         specify 3 subplots, in order of top to bottom, with palettable colortables
         """
         # timeseries_file = join_path(self.main_directory,timeseries_file)
-        output_file = join_path(self.main_directory,output_file)
+        output_file = join_path(self.main_directory,self.style,output_file)
         _log.info(f'Creating {output_file}')
 
         #get metadata from deployment YAML
