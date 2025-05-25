@@ -12,7 +12,12 @@ dependencies = [
     "numpy",
     "xarray",
     "gsw",
-    "pyglider"
+    "pyglider",
+    "pygmt",
+    "openpyxl",
+    "ioos_qc",
+    "compliance_checker",
+    "utm"
 ]
 
 [project.scripts]

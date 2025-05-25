@@ -12,7 +12,9 @@ We recommend creating a virtual environment.
 1. `conda create -n kiwiglider`
 1. `conda activate kiwiglider`
 
-Installing kiwiglider in your environment needs to be done through git and pip, so also be sure that you have [Git](https://git-scm.com/downloads) installed on your machine. With Git installed, 
+From your new virtual environment, you can now install kiwiglider. The easiest method is with `pip install kiwiglider@git+https://github.com/adeverne/kiwiglider`
+
+Another method of installation is through git and pip. This will allow you to edit kiwiglider in a local repository. After you have [Git](https://git-scm.com/downloads) installed on your machine: 
 
 1. Clone kiwiglider to your local machine: `git clone https://github.com/adeverne/kiwiglider`
 1. Change to parent directory of kiwiglider
