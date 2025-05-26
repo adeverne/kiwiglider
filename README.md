@@ -12,6 +12,8 @@ We recommend creating a virtual environment.
 1. `conda create -n kiwiglider`
 1. `conda activate kiwiglider`
 
+As of 26 May 2025, one dependency fails under pip but works with conda. As such, also do `conda install compliance-checker`
+
 From your new virtual environment, you can now install kiwiglider. The easiest method is with `pip install kiwiglider@git+https://github.com/adeverne/kiwiglider`
 
 Another method of installation is through git and pip. This will allow you to edit kiwiglider in a local repository. After you have [Git](https://git-scm.com/downloads) installed on your machine: 
