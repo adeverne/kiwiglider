@@ -16,10 +16,12 @@ dependencies = [
     "pygmt",
     "openpyxl",
     "ioos_qc",
-    "compliance_checker",
     "cc-plugin-glider",
     "cmocean",
-    "utm"
+    "utm",
+    "matplotlib",
+    "palettable",
+    "distinctipy"
 ]
 
 [project.scripts]
