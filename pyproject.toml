@@ -12,17 +12,25 @@ dependencies = [
     "numpy",
     "xarray",
     "gsw",
-    "dbdreader",
     "pyglider",
-    "pygmt",
     "openpyxl",
-    "ioos_qc",
-    "cc-plugin-glider",
-    "cmocean",
     "utm",
+]
+
+[project.optional-dependences]
+dbd = [
+    "dbdreader"
+]
+plot = [
+    "pygmt",
+    "cmocean",
     "matplotlib",
     "palettable",
     "distinctipy"
+]
+ioos = [
+    "ioos_qc",
+    "cc-plugin-glider"
 ]
 
 [project.scripts]

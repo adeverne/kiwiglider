@@ -1,7 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 # steps.py in kiwiglider
-# This is the main code for the package, with itemized steps that follow (in
-# spirit) the workflow from the GEOMAR glider package.
+# This is the main postprocesing code for the kiwiglider package, with
+# itemized steps that follow (in spirit) the workflow from the GEOMAR
+# glider matlab package.
 
 
 def step_00(rootDir: str, verbose: bool = True) -> None:
@@ -94,7 +95,8 @@ def step_00(rootDir: str, verbose: bool = True) -> None:
 
     # For simplicity, but also because dbdreader uses glob to list all the
     # DBD/EBD files, re-locate all DBD/EBD files to single "raw" directory
-    # with CAC files in sub-directory Cache/, and make extensions upper-case
+    # with CAC files in sub-directory Cache/. Read metadata and re-name the
+    # files.
     # Check to see if copies already exist....
     e1 = glob(os.path.join(rootDir, "Raw", "*.EBD"))
     e1name = [x.split('/')[-1] for x in e1]
@@ -186,7 +188,9 @@ def setupcheck(rootDir: str, verbose: bool = True) -> tuple:
     return (rawDir, cacheDir)
 
 
-def step_01(rootDir: str, verbose: bool = True) -> None:
+# TODO: 
+def step_01(rootDir: str, verbose: bool = True, start_date: float = None,
+            end_date: float = None) -> None:
     """
     function step01(procDir, verbose)
     Input:
