@@ -4,7 +4,7 @@ Utilities for processing Slocum glider files the Kiwi way
 from importlib import import_module  # used to import from palettable
 import numpy as np
 from distinctipy import get_colors, get_colormap
-from colormap import MPLWrapperColormap
+from kiwiglider.colormap import MPLWrapperColormap
 
 
 def dd2dm(decimal_degrees):

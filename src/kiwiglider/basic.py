@@ -23,7 +23,7 @@ from datetime import datetime
 import pygmt
 from utm import from_latlon
 from inspect import getmodule
-from utils import dd2dm, dm2dd, temporary_cpt, first_nonnan, last_nonnan
+from kiwiglider.utils import dd2dm, dm2dd, temporary_cpt, first_nonnan, last_nonnan
 
 
 _log = logging.getLogger(__name__)
