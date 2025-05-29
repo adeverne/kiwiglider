@@ -20,9 +20,7 @@ dependencies = [
     "cmocean",
     "matplotlib",
     "palettable",
-    "distinctipy",
-    "ioos_qc",
-    "cc-plugin-glider"
+    "distinctipy"
 ]
 
 [project.optional-dependences]
