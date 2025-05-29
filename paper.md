@@ -1,94 +1,80 @@
 
 ---
-title: 'Gala: A Python package for galactic dynamics'
-tags:
+# title: 'KiwiGlider: A Python package for post-processing Slocum Glider Data'
+
+## tags:
   - Python
-  - astronomy
-  - dynamics
-  - galactic dynamics
-  - milky way
-authors:
-  - name: Adrian M. Price-Whelan
-    orcid: 0000-0000-0000-0000
+  - oceanography
+  - gliders
+  - autonomous science
+
+## authors:
+  - name: Alain de Verneil
+    orcid: 0000-0002-8344-7953
     equal-contrib: true
-    affiliation: "1, 2" # (Multiple affiliations must be quoted)
-  - name: Author Without ORCID
+    affiliation: 1 # (Multiple affiliations must be quoted)
+    corresponding: true
+  - name: Cassandra Elmer
     equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
-    affiliation: 2
-  - name: Author with no affiliation
-    corresponding: true # (This is how to denote the corresponding author)
-    affiliation: 3
-  - given-names: Ludwig
-    dropping-particle: van
-    surname: Beethoven
-    affiliation: 3
+    affiliation: 1
 affiliations:
- - name: Lyman Spitzer, Jr. Fellow, Princeton University, United States
+ - name: National Institute of Water and Atmospheric research (NIWA), New Zealand
    index: 1
-   ror: 00hx57361
- - name: Institution Name, Country
-   index: 2
- - name: Independent Researcher, Country
-   index: 3
-date: 13 August 2017
+
+date: 30 May 2025
 bibliography: paper.bib
 
-# Optional fields if submitting to a AAS journal too, see this blog post:
-# https://blog.joss.theoj.org/2018/12/a-new-collaboration-with-aas-publishing
-aas-doi: 10.3847/xxxxx <- update this with the DOI from AAS once you know it.
-aas-journal: Astrophysical Journal <- The name of the AAS journal.
----
+## Summary
 
-# Summary
+The ocean is the most undersampled domain of the Earth's surface for several
+reasons, primarily due to its relative remoteness for humans and the attendant
+expense for utilizing research vessels, but also due to its opaqueness to
+electromagnetic radiation precluding satellite remote sensing from observing
+deeper than the near-surface. Autonomous sampling platforms promise to increase
+the total amount of in situ data substantially for lesser cost. Ocean gliders
+are such a platform, with the ability to conduct surveys while periodically
+receiving directives and sending data via satellite in near real time. Among
+the most popular glider platforms is the Slocum glider produced by Teledyne
+Webb Research. While tools exist for the retrieval of raw data from gliders,
+many of the desired scientific oceanographic outputs from gliders require
+post-processing before being considered acceptable for scientific publication
+in the wider community, creating a demand among end users for open-source
+software to reliably conduct this processing.
 
-The forces on stars, galaxies, and dark matter under external gravitational
-fields lead to the dynamical evolution of structures in the universe. The orbits
-of these bodies are therefore key to understanding the formation, history, and
-future state of galaxies. The field of "galactic dynamics," which aims to model
-the gravitating components of galaxies to study their structure and evolution,
-is now well-established, commonly taught, and frequently used in astronomy.
-Aside from toy problems and demonstrations, the majority of problems require
-efficient numerical tools, many of which require the same base code (e.g., for
-performing numerical orbit integration).
+## Statement of need
 
-# Statement of need
+`KiwiGlider` is a Python package for post-processing Slocum glider data. It
+bridges a gap in the data processing pipeline that currently exists in the
+Python ecosystem. At one end packages exist for reliable and fast
+reading of raw data (e.g. `PyGlider` and `dbdreader`), while on the other end
+there are solutions for more final processing of quality controlled data (e.g.
+optimal interpolation, or Krigging, of transects by `GliderTools`). In between
+is the necessary post-processing of scientific variables (e.g. lag corrections
+for salinity, oxygen optodes), which `KiwiGlider` is meant to address. By
+leveraging the existing Python ecosystem in this space, `KiwiGlider` also hopes
+to provide an end-to-end solution, from reading raw data in near real time
+during deployment in the field up through the delayed post-processing of an
+entire dataset in preparation for scientific publication.
 
-`Gala` is an Astropy-affiliated Python package for galactic dynamics. Python
-enables wrapping low-level languages (e.g., C) for speed without losing
-flexibility or ease-of-use in the user-interface. The API for `Gala` was
-designed to provide a class-based and user-friendly interface to fast (C or
-Cython-optimized) implementations of common operations such as gravitational
-potential and force evaluation, orbit integration, dynamical transformations,
-and chaos indicators for nonlinear dynamics. `Gala` also relies heavily on and
-interfaces well with the implementations of physical units and astronomical
-coordinate systems in the `Astropy` package [@astropy] (`astropy.units` and
-`astropy.coordinates`).
+# Capabilities
 
-`Gala` was designed to be used by both astronomical researchers and by
-students in courses on gravitational dynamics or astronomy. It has already been
-used in a number of scientific publications [@Pearson:2017] and has also been
-used in graduate courses on Galactic dynamics to, e.g., provide interactive
-visualizations of textbook material [@Binney:2008]. The combination of speed,
-design, and support for Astropy functionality in `Gala` will enable exciting
-scientific explorations of forthcoming data releases from the *Gaia* mission
-[@gaia] by students and experts alike.
+At its heart, `KiwiGlider` is meant to add certain post-processing to Slocum
+glider data that does not currently exist in Python. However, post-processing
+routines do exist out in the community more generally, and where possible we
+have ported this functionality to the Python code to `KiwiGlider`.
 
-# Mathematics
+For example, using Matlab code from the GEOMAR glider toolbox, we have adapted
+routines to:
+  - Run quality control on glider telemetry (e.g. GPS longitude/latitude).
+  - Calculate best temperature lag for salinity calculations, following
+    [Garau et al. 2011](https://doi.org/10.1175/JTECH-D-10-05030.1).
+  - Calculate optode delays in oxygen sensors.
 
-Single dollars ($) are required for inline mathematics e.g. $f(x) = e^{\pi/x}$
-
-Double dollars make self-standing equations:
-
-$$\Theta(x) = \left\{\begin{array}{l}
-0\textrm{ if } x < 0\cr
-1\textrm{ else}
-\end{array}\right.$$
-
-You can also use plain \LaTeX for equations
-\begin{equation}\label{eq:fourier}
-\hat f(\omega) = \int_{-\infty}^{\infty} f(x) e^{i\omega x} dx
-\end{equation}
-and refer to \autoref{eq:fourier} from text.
+In addition to the usual post-processing, we also make use of existing packages
+necessary for extended applications. One example of this is the use of the
+`gliderflight` package which optimizes parameters around flight models of the
+glider to produce accurate flow speeds for microstructure turbulence
+measurements.
 
 # Citations
 
@@ -115,7 +101,8 @@ Figure sizes can be customized by adding an optional second parameter:
 
 # Acknowledgements
 
-We acknowledge contributions from Brigitta Sipocz, Syrtis Major, and Semyeong
-Oh, and support from Kathryn Johnston during the genesis of this project.
+We acknowledge support from the New Zealand MBIE Strategic Scientific Investment
+Fund (SSIF), and the contributions from J. O'Callaghan, J. McInerney,
+C. Stevens, and C. Collins.
 
 # References
