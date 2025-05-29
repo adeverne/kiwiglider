@@ -15,6 +15,7 @@
     affiliation: 1 # (Multiple affiliations must be quoted)
     corresponding: true
   - name: Cassandra Elmer
+    orcid: 0009-0006-3619-3571
     equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
     affiliation: 1
 affiliations:
