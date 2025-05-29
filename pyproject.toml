@@ -1,6 +1,6 @@
 [project]
 name = "kiwiglider"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python package to fill the gap in post-processing Slocum glider data from raw binary (as done in pyglider) to higher-level processing (glidertools)."
 readme = "README.md"
 authors = [
