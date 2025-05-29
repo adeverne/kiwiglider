@@ -15,6 +15,14 @@ dependencies = [
     "pyglider",
     "openpyxl",
     "utm",
+    "dbdreader",
+    "pygmt",
+    "cmocean",
+    "matplotlib",
+    "palettable",
+    "distinctipy",
+    "ioos_qc",
+    "cc-plugin-glider"
 ]
 
 [project.optional-dependences]
