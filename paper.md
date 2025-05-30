@@ -12,11 +12,11 @@
   - name: Alain de Verneil
     orcid: 0000-0002-8344-7953
     equal-contrib: true
-    affiliation: 1 # (Multiple affiliations must be quoted)
+    affiliation: 1 <!-- # (Multiple affiliations must be quoted) -->
     corresponding: true
   - name: Cassandra Elmer
     orcid: 0009-0006-3619-3571
-    equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
+    equal-contrib: true <!-- > (This is how you can denote equal contributions between multiple authors) -->
     affiliation: 1
 affiliations:
  - name: National Institute of Water and Atmospheric research (NIWA), New Zealand
