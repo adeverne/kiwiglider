@@ -162,3 +162,32 @@ def setup(rootDir: str, startDate: float = None, endDate: float = None,
     if verbose:
         print("Raw directory exists, and any new EBD/DBD/cache files have" +
               "been copied and have upper-case extension names.")
+
+
+def _setupcheck(rootDir: str, verbose: bool = True) -> tuple:
+    """
+    function setupcheck(rootDir, verbose)
+
+    Input:
+        rootDir - Path to root processing directory
+        verbose - Logical switch to print detailed status.
+
+    Output:
+
+    Description:
+        Function invoked at beginning of steps to double-check that the
+        user-provided directory is a good root directory for processing
+        as defined in kiwiglider. Returns tuple with raw and cache paths.
+    """
+    import os
+    if not os.path.exists(os.path.join(rootDir, "Raw")):
+        raise Exception(f"Now Raw directory in {rootDir}, either " +
+                        "directory or run step_00 first.")
+    else:
+        rawDir = os.path.join(rootDir, "Raw")
+    if not os.path.exists(os.path.join(rawDir, "Cache")):
+        raise Exception("Raw directory found, but not Cache. " +
+                        "Please re-run step_00")
+    else:
+        cacheDir = os.path.join(rawDir, "Cache")
+    return (rawDir, cacheDir)
