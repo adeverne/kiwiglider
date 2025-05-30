@@ -4,6 +4,7 @@ Classes to process Slocum glider files the (basic) Kiwi way
 from os.path import join as join_path
 from os.path import basename, exists
 from os import makedirs, listdir
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 from itertools import groupby
 import yaml
@@ -963,7 +964,8 @@ class DeploymentNetCDF():
     """
 
     def __init__(self, main_directory, binary_directory='Raw',
-                 cache_directory=join_path('Raw','Cache'),
+                 cache_directory=join_path('Raw', 'Cache'),
+                 style='Realtime',
                  deployment_yaml='deployment_metadata.yml'):
         """
         initialize class with directory and file pathnames
@@ -973,14 +975,16 @@ class DeploymentNetCDF():
         self.main_directory = main_directory
         self.binary_directory = join_path(main_directory, binary_directory)
         self.cache_directory = join_path(main_directory, cache_directory)
+        self.style = style
         self.deployment_yaml = join_path(main_directory, deployment_yaml)
 
     def read_timeseries(self, timeseries_file):
         """
         read a timeseries NetCDF created by make_L0 or make_L1
-        filename is relative to main_directory
+        filename is relative to main_directory and style
         """
-        timeseries_file = join_path(self.main_directory, timeseries_file)
+        timeseries_file = join_path(self.main_directory, self.style,
+                                    timeseries_file)
         _log.info(f'Reading {timeseries_file} into memory')
         with xr.open_dataset(timeseries_file) as ds:
             return ds
@@ -988,15 +992,15 @@ class DeploymentNetCDF():
     def read_profiles(self, profile_directory):
         """
         read a directory of profile NetCDFs as a single dataset
-        directory name is relative to main_directory
+        directory name is relative to main_directory and style
         """
-        profile_directory = join_path(self.main_directory, profile_directory,
-                                      '*.nc')
+        profile_directory = join_path(self.main_directory, self.style,
+                                      profile_directory,'*.nc')
         _log.info(f'Reading all files in {profile_directory} into memory')
         with xr.open_mfdataset(profile_directory) as ds:
             return ds
 
-    def make_L0(self, style='Realtime', l0timeseries_directory='L0-timeseries',
+    def make_L0(self, l0timeseries_directory='L0-timeseries',
                 l0profile_directory='L0-profiles'):
         """
         create the L0 (read and interpolate according to PyGlider) timeseries
@@ -1005,7 +1009,6 @@ class DeploymentNetCDF():
         give l0profile_directory None or False to skip writing profile NetCDFs
         """
         # assign inputs
-        self.style = style
         match self.style:
             case 'Realtime':
                 self.search = '*.[s|t]bd'
@@ -1075,9 +1078,10 @@ class DeploymentNetCDF():
             makedirs(self.l1timeseries_directory)
 
         # create output name based on L0 name
-        self.l1timeseries_outname = join_path(self.l1timeseries_directory,
-                                              basename(
-                                                  self.l0timeseries_outname))
+        self.l1timeseries_outname = join_path(
+            self.l1timeseries_directory,
+            basename(self.l0timeseries_outname)
+        )
         _log.info('Creating L1 single timeseries ' +
                   f'NetCDF {self.l1timeseries_outname}')
 
@@ -1273,8 +1277,10 @@ class DeploymentNetCDF():
         self.passing_state = {join_path(profile_directory, file):
                               state for file, state in zip(file_names, passed)}
 
-    def create_summary(self, timeseries_file, output_file, author='Anonymous',
-                       extra_text='', map_bounds=None, globe_position='BL',
+    def create_summary(self, timeseries_file='L0', output_file='L0',
+                       display=False,
+                       author='Anonymous', extra_text='',
+                       map_bounds=None, globe_position='BL',
                        plots=({'source': 'temperature', 'cmap':
                                'cmocean.sequential.Thermal_20'},
                               {'source': 'salinity', 'cmap':
@@ -1284,6 +1290,10 @@ class DeploymentNetCDF():
         """
         output a summary page from a timeseries NetCDF file
         filenames are relative to main_directory and style
+        timeseries can be abbreviated with 'L0' or 'L1' to refer to
+        files created in previous steps or defined explicitly
+        define output_file=False to skip file creation (requires display=True)
+        display will render the summary in default viewer or notebook
         extra_text adds text on the same line as funding acknowledgement
         map_bounds in [minimum latitude, maximum latitude, minimum longitude,
         maximum longitude] form
@@ -1291,9 +1301,65 @@ class DeploymentNetCDF():
         specify 3 subplots, in order of top to bottom, with palettable
         colortables
         """
-        # timeseries_file = join_path(self.main_directory,timeseries_file)
-        output_file = join_path(self.main_directory, self.style, output_file)
-        _log.info(f'Creating {output_file}')
+        # re-define inputs
+        match timeseries_file:
+            case 'L0':
+                if not hasattr(self, 'l0timeseries_outname'):
+                    raise AttributeError(
+                        'DeploymentNetCDF class does not have attribute ' +
+                        '"l0timeseries_outname". Must run ' +
+                        'DeploymentNetCDF.make_l0 to use ' +
+                        'timeseries_file input "L0".'
+                    )
+                timeseries_file = self.l0timeseries_outname
+            case 'L1':
+                if not hasattr(self, 'l1timeseries_outname'):
+                    raise AttributeError(
+                        'DeploymentNetCDF class does not have attribute ' +
+                        '"l1timeseries_outname". Must run ' +
+                        'DeploymentNetCDF.make_l1 to use ' +
+                        'timeseries_file input "L1".'
+                    )
+                timeseries_file = self.l1timeseries_outname
+            case _:
+                timeseries_file = join_path(
+                    self.main_directory, self.style,
+                    timeseries_file
+                )
+        match output_file:
+            case 'L0':
+                if not hasattr(self, 'l0timeseries_outname'):
+                    raise AttributeError(
+                        'DeploymentNetCDF class does not have attribute ' +
+                        '"l0timeseries_outname". Must run ' +
+                        'DeploymentNetCDF.make_l0 to use ' +
+                        'output_file input "L0".'
+                    )
+                output_file = join_path(
+                    self.main_directory, self.style,
+                    Path(self.l0timeseries_outname).stem + '.png'
+                )
+            case 'L1':
+                if not hasattr(self, 'l1timeseries_outname'):
+                    raise AttributeError(
+                        'DeploymentNetCDF class does not have attribute ' +
+                        '"l1timeseries_outname". Must run ' +
+                        'DeploymentNetCDF.make_l1 to use ' +
+                        'output_file input "L1".'
+                    )
+                output_file = join_path(
+                    self.main_directory, self.style,
+                    Path(self.l1timeseries_outname).stem + '.png'
+                )
+            case False:
+                pass
+            case _:
+                output_file = join_path(
+                    self.main_directory, self.style,
+                    output_file
+                )
+        
+        _log.info('Creating summary page')
 
         # get metadata from deployment YAML
         with open(self.deployment_yaml) as fin:
@@ -1555,5 +1621,10 @@ class DeploymentNetCDF():
             f.close()
             fig.text(textfiles=f.name, font=8, justify='TC', M=True)
         # save
-        _log.info(f'Saving summary page as {output_file}')
-        fig.savefig(output_file, crop=False)
+        if output_file:
+            _log.info(f'Saving summary page as {output_file}')
+            fig.savefig(output_file, crop=False)
+        # display
+        if display:
+            _log.info('Displaying summary page')
+            fig.show(crop=False)
