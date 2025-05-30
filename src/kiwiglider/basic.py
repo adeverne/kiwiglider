@@ -976,7 +976,9 @@ class DeploymentNetCDF():
         self.binary_directory = join_path(main_directory, binary_directory)
         self.cache_directory = join_path(main_directory, cache_directory)
         self.style = style
-        self.deployment_yaml = join_path(main_directory, deployment_yaml)
+        self.deployment_yaml = join_path(
+            main_directory, style, deployment_yaml
+        )
 
     def read_timeseries(self, timeseries_file):
         """
@@ -995,7 +997,7 @@ class DeploymentNetCDF():
         directory name is relative to main_directory and style
         """
         profile_directory = join_path(self.main_directory, self.style,
-                                      profile_directory,'*.nc')
+                                      profile_directory, '*.nc')
         _log.info(f'Reading all files in {profile_directory} into memory')
         with xr.open_mfdataset(profile_directory) as ds:
             return ds
@@ -1358,7 +1360,7 @@ class DeploymentNetCDF():
                     self.main_directory, self.style,
                     output_file
                 )
-        
+
         _log.info('Creating summary page')
 
         # get metadata from deployment YAML
