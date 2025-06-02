@@ -1,11 +1,16 @@
 ![image](kiwiglider_logo.png)
 
 # kiwiglider
-NIWA's python library to process SLOCUM glider data, incorporating pre-existing packages PyGliders and GliderTools.
+A Python package to process Teledyne Webb Research SLOCUM glider data, incorporating pre-existing packages PyGliders and GliderTools.
 
 ---
 
-# Installation
+## General Description
+Gliders are autonomous sampling platforms that have become popular in the oceanographic research community over the past two decades. Teledyne Webb Research's Slocum gliders are among the most popular. Here the goal is to provide code to facilitate two main uses cases:
+1. Near real time processing of data being sent via satellite during a glider deployment, including IOOS-recommended quality control checks, for submission to data assembly centers
+2. Delayed time processing of scientific data to publication quality status, including routines to perform well-established corrections for known instrument.
+
+## Installation
 
 You will need a C-compiler to use kiwiglider, since it relies on a package called dbdreader. See dbdreader installation suggestions for [Linux](https://github.com/smerckel/dbdreader?tab=readme-ov-file#installation-linux) and [Windows](https://github.com/smerckel/dbdreader?tab=readme-ov-file#installation-on-windows) for information about C-compilers (note that you do not need to install dbdreader itself at this stage)
 
