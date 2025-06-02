@@ -19,7 +19,7 @@ We recommend creating a virtual environment.
 1. `conda create -n kiwiglider`
 1. `conda activate kiwiglider`
 
-As of 26 May 2025, one dependency fails under pip but works with conda. As such, also do `conda install compliance-checker`
+As of 26 May 2025, one dependency fails under pip but works with conda. As such, also do `conda install compliance-checker cc-plugin-glider`
 
 From your new virtual environment, you can now install kiwiglider. The easiest method is with `pip install kiwiglider@git+https://github.com/adeverne/kiwiglider`
 
@@ -29,9 +29,16 @@ Another method of installation is through git and pip. This will allow you to ed
 1. Change to parent directory of kiwiglider
 1. Install kiwiglider with `pip install -e ./kiwiglider`
 
+For the moment we are not listed on PyPi due to ongoing testing, but if you wish to install from TestPyPi please do the following:
+
+`pip install --index-url https://test.pypi.org/simple --extra-index-url https:/pypi.org/simple/ kiwiglider`
+
 ---
 
 # Getting started
+
+For the June 2025 Hack-a-thon:
+[Hackathon Summary Page Notebook](https://github.com/adeverne/kiwiglider/blob/main/notebooks/Hackathon_summaries.ipynb)
 
 See [Jupyter notebook](https://github.com/adeverne/kiwiglider/tree/main/notebooks/Glider_BasicProcessing.ipynb)
 
