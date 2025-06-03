@@ -21,17 +21,23 @@ We recommend creating a virtual environment.
 
 As of 26 May 2025, one dependency fails under pip but works with conda. As such, also do `conda install compliance-checker cc-plugin-glider`
 
+### Method 1
+
 From your new virtual environment, you can now install kiwiglider. The easiest method is with `pip install kiwiglider@git+https://github.com/adeverne/kiwiglider`
+
+### Method 2
+
+For the moment we are not listed on PyPi due to ongoing testing, but if you wish to install from TestPyPi please do the following:
+
+`pip install --index-url https://test.pypi.org/simple --extra-index-url https:/pypi.org/simple/ kiwiglider`
+
+### Method 3
 
 Another method of installation is through git and pip. This will allow you to edit kiwiglider in a local repository. After you have [Git](https://git-scm.com/downloads) installed on your machine: 
 
 1. Clone kiwiglider to your local machine: `git clone https://github.com/adeverne/kiwiglider`
 1. Change to parent directory of kiwiglider
 1. Install kiwiglider with `pip install -e ./kiwiglider`
-
-For the moment we are not listed on PyPi due to ongoing testing, but if you wish to install from TestPyPi please do the following:
-
-`pip install --index-url https://test.pypi.org/simple --extra-index-url https:/pypi.org/simple/ kiwiglider`
 
 ---
 
