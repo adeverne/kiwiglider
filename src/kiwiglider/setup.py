@@ -5,16 +5,18 @@
 # We follow this up with either reading in the YAML file for the deployment,
 # or autogenerating one from the metadata.
 
-def setup(rootDir: str, startDate: float = None, endDate: float = None,
-          verbose: bool = True) -> None:
+def setup(rootDir: str, outDir: str = None, startDate: float = None,
+          endDate: float = None, verbose: bool = True) -> None:
     """
-    setup(rootDir: str, startDate: float = none, endDate: float = None,
-          verbose: bool = True) -> None
+    setup(rootDir: str, outDir: str = None, startDate: float = None,
+          endDate: float = None, verbose: bool = True) -> None
     Parameters
     -----------
         rootDir : string
-            Base directory for processing. Somewhere inside should be
-            raw EBD/DBD/SBD/TBD files
+            Directory with raw EBD/DBD/SBD/TBD/CAC files for processing.
+        outDir  : string
+            Directory to which the subdirectory "Raw" will be created and
+            copies of raw data and cache files to be sent.
         startDate : float, default = None
         startDate (float) = None  POSIX timestamp (i.e. seconds since
             1970-01-01Z00:00:00) indicating start of deployment.
@@ -26,7 +28,9 @@ def setup(rootDir: str, startDate: float = None, endDate: float = None,
     import os
     from glob import glob
     import shutil
+    import sys
     from datetime import datetime, UTC
+    from pyglider import slocum
 
     if verbose:
         print("Initiated setup of Kiwiglider at " +
@@ -39,29 +43,36 @@ def setup(rootDir: str, startDate: float = None, endDate: float = None,
     else:
         raise ValueError("This path either does not exist, or it is '.'," +
                          " which cannot be used. Please write full path.")
+    # Default value of outDir is rootDir
+    if not outDir:
+        outDir = rootDir
 
     # Check to see if Raw directory already exists
-    if os.path.exists(os.path.join(rootDir, "Raw")):
+    if os.path.exists(os.path.join(outDir, "Raw")):
         if verbose:
             print("Raw directory already exists...")
-        if os.path.exists(os.path.join(rootDir, "Raw", "Cache")):
+        if os.path.exists(os.path.join(outDir, "Raw", "Cache")):
             if verbose:
                 print("Raw AND Cache directories exist.")
         else:
             if verbose:
                 print("Creating Cache directory")
-            os.makedirs(os.path.join(rootDir, "Raw", "Cache"))
+            os.makedirs(os.path.join(outDir, "Raw", "Cache"))
     else:
         if verbose:
             print("Making Raw directory for dbd/ebd and cache files.")
-        os.makedirs(os.path.join(rootDir, "Raw"))
-        os.makedirs(os.path.join(rootDir, "Raw", "Cache"))
+        os.makedirs(os.path.join(outDir, "Raw"))
+        os.makedirs(os.path.join(outDir, "Raw", "Cache"))
 
     # Walk through rootDir, search for where EBD, DBD, CAC files are stored...
     dbdDirs = []
     nDBD = 0
     ebdDirs = []
     nEBD = 0
+    sbdDirs = []
+    nSBD = 0
+    tbdDirs = []
+    nTBD = 0
     cacDirs = []
     nCAC = 0
     if verbose:
@@ -81,6 +92,16 @@ def setup(rootDir: str, startDate: float = None, endDate: float = None,
                     nDBD += 1
                     if root not in dbdDirs:
                         dbdDirs.append(root)
+                # Check for sbd...
+                if os.path.splitext(filename)[1] in [".SBD", ".sbd"]:
+                    nSBD += 1
+                    if root not in sbdDirs:
+                        sbdDirs.append(root)
+                # Check for tbd...
+                if os.path.splitext(filename)[1] in [".TBD", ".tbd"]:
+                    nTBD += 1
+                    if root not in tbdDirs:
+                        tbdDirs.append(root)
                 # Check for CAC cache files...
                 if os.path.splitext(filename)[1] in [".CAC", ".cac"]:
                     nCAC += 1
@@ -94,18 +115,24 @@ def setup(rootDir: str, startDate: float = None, endDate: float = None,
         print(f"Found {len(dbdDirs):02d} directories with a " +
               f"total of {nDBD} dbd files ...")
         [print(f"{x}") for x in dbdDirs]
+        print(f"Found {len(sbdDirs):02d} directories with a " +
+              f"total of {nSBD} sbd files ...")
+        [print(f"{x}") for x in sbdDirs]
+        print(f"Found {len(tbdDirs):02d} directories with a " +
+              f"total of {nTBD} tbd files ...")
+        [print(f"{x}") for x in tbdDirs]
         print(f"Found {len(cacDirs):02d} directories with a " +
               f"total of {nCAC} cac files:")
         [print(f"{x}") for x in cacDirs]
 
     # For simplicity, but also because dbdreader uses glob to list all the
-    # DBD/EBD files, re-locate all DBD/EBD files to single "raw" directory
-    # with CAC files in sub-directory Cache/. Read metadata and re-name the
-    # files.
+    # DBD/EBD/SBD/TBD files, re-locate all DBD/EBD files to single "raw"
+    # directory with CAC files in sub-directory Cache/. Read metadata and
+    # re-name the files.
     # Check to see if copies already exist....
-    e1 = glob(os.path.join(rootDir, "Raw", "*.EBD"))
+    e1 = glob(os.path.join(outDir, "Raw", "*.EBD"))
     e1name = [x.split('/')[-1] for x in e1]
-    e2 = glob(os.path.join(rootDir, "Raw", "*.ebd"))
+    e2 = glob(os.path.join(outDir, "Raw", "*.ebd"))
     e2name = [x.split('/')[-1] for x in e2]
 
     if len(e1) + len(e2) != nEBD:
@@ -118,12 +145,13 @@ def setup(rootDir: str, startDate: float = None, endDate: float = None,
                     if os.path.splitext(filename)[1] in [".EBD", ".ebd"]:
                         if (filename not in e1name) & (filename not in e2name):
                             shutil.copyfile(os.path.join(root, filename),
-                                            os.path.join(rootDir, "Raw",
+                                            os.path.join(outDir, "Raw",
                                                          filename))
-    d1 = glob(os.path.join(rootDir, "Raw", "*.DBD"))
+    d1 = glob(os.path.join(outDir, "Raw", "*.DBD"))
     d1name = [x.split('/')[-1] for x in d1]
-    d2 = glob(os.path.join(rootDir, "Raw", "*.dbd"))
+    d2 = glob(os.path.join(outDir, "Raw", "*.dbd"))
     d2name = [x.split('/')[-1] for x in d2]
+
     if len(d1)+len(d2) != nDBD:
         if verbose:
             print(f"Found {len(d1) + len(d2)} dbd files in Raw, but " +
@@ -134,11 +162,45 @@ def setup(rootDir: str, startDate: float = None, endDate: float = None,
                     if os.path.splitext(filename)[1] in [".DBD", ".dbd"]:
                         if (filename not in d1name) & (filename not in d2name):
                             shutil.copyfile(os.path.join(root, filename),
-                                            os.path.join(rootDir, "Raw",
+                                            os.path.join(outDir, "Raw",
                                                          filename))
-    c1 = glob(os.path.join(rootDir, "Raw", "Cache", "*.CAC"))
+    s1 = glob(os.path.join(outDir, "Raw", "*.SBD"))
+    s1name = [x.split('/')[-1] for x in s1]
+    s2 = glob(os.path.join(outDir, "Raw", "*.sbd"))
+    s2name = [x.split('/')[-1] for x in s2]
+    if len(s1) + len(s2) != nSBD:
+        if verbose:
+            print(f"Found {len(s1) + len(s2)} sbd files in Raw, but " +
+                  f"detected {nSBD} files in total... will copy new files.")
+        for sdir in sbdDirs:
+            for root, _, files in os.walk(sdir):
+                for filename in files:
+                    if os.path.splitext(filename)[1] in [".SBD", ".sbd"]:
+                        if (filename not in s1name) & (filename not in s2name):
+                            shutil.copyfile(os.path.join(root, filename),
+                                            os.path.join(outDir, "Raw",
+                                                         filename))
+
+    t1 = glob(os.path.join(outDir, "Raw", "*.TBD"))
+    t1name = [x.split('/')[-1] for x in s1]
+    t2 = glob(os.path.join(outDir, "Raw", "*.tbd"))
+    t2name = [x.split('/')[-1] for x in s2]
+    if len(t1) + len(t2) != nTBD:
+        if verbose:
+            print(f"Found {len(t1) + len(t2)} tbd files in Raw, but " +
+                  f"detected {nSBD} files in total... will copy new files.")
+        for sdir in sbdDirs:
+            for root, _, files in os.walk(sdir):
+                for filename in files:
+                    if os.path.splitext(filename)[1] in [".TBD", ".tbd"]:
+                        if (filename not in t1name) & (filename not in t2name):
+                            shutil.copyfile(os.path.join(root, filename),
+                                            os.path.join(outDir, "Raw",
+                                                         filename))
+
+    c1 = glob(os.path.join(outDir, "Raw", "Cache", "*.CAC"))
     c1name = [x.split('/')[-1] for x in c1]
-    c2 = glob(os.path.join(rootDir, "Raw", "Cache", "*.cac"))
+    c2 = glob(os.path.join(outDir, "Raw", "Cache", "*.cac"))
     c2name = [x.split('/')[-1] for x in c2]
     if len(c1)+len(c2) != nCAC:
         if verbose:
@@ -150,18 +212,33 @@ def setup(rootDir: str, startDate: float = None, endDate: float = None,
                     if os.path.splitext(filename)[1] in [".CAC", ".cac"]:
                         if (filename not in c1name) & (filename not in c2name):
                             shutil.copyfile(os.path.join(root, filename),
-                                            os.path.join(rootDir, "Raw",
+                                            os.path.join(outDir, "Raw",
                                                          "Cache", filename))
-    # Rename ebd/dbd/cac files to have uppercase extensions...
-    for root, _, files in os.walk(os.path.join(root, "Raw")):
+    # Rename all files to have full filenames from metadata...
+    for root, _, files in os.walk(os.path.join(outDir, "Raw")):
         for filename in files:
             path, ext = os.path.splitext(filename)
-            if ext in ["ebd", "dbd", "cac"]:
-                shutil.copyfile(os.path.join(root, filename),
-                                os.path.join(root, path, ext.upper()))
+            if ext in [".ebd", ".dbd", ".EBD", ".DBD", ".sbd", ".SBD",
+                       ".tbd", ".TBD"]:
+                try:
+                    meta = slocum.dbd_get_meta(os.path.join(root, filename),
+                                               cachedir=os.path.join(root,
+                                                                     "Cache"))
+                    print("Meta got loaded...")
+                    newname = meta[0]['full_filename']
+                    shutil.copyfile(os.path.join(root, filename),
+                                    os.path.join(root, newname + ext.lower()))
+                    print(f"Removing {filename}...")
+                    os.remove(os.path.join(root, filename))
+                except Exception:
+                    e = sys.exc_info()[0]
+                    print(f"Error: {e}")
+                    print(f"Cannot load metadata for file {filename}")
+                    print("Moving on to next file...")
+
     if verbose:
-        print("Raw directory exists, and any new EBD/DBD/cache files have" +
-              "been copied and have upper-case extension names.")
+        print("Raw directory exists, and any new EBD/DBD/SBD/TBD/cache files" +
+              " have been copied over and re-named.")
 
 
 def _setupcheck(rootDir: str, verbose: bool = True) -> tuple:

@@ -27,6 +27,7 @@ def step_01(rootDir: str, verbose: bool = True, start_date: float = None,
     import sys
     import numpy as np
     import xarray as xr
+    from . import setup
     try:
         import dbdreader
         from dbdreader import DbdError
@@ -37,7 +38,7 @@ def step_01(rootDir: str, verbose: bool = True, start_date: float = None,
         from pyglider import slocum
 
     # Run setup check
-    rawDir, cacheDir = setupcheck(rootDir)
+    rawDir, cacheDir = setup._setupcheck(rootDir)
 
     # Check for EBD/DBD and .CAC files in Raw and Raw/Cache (if they exist)...
     eList = sorted(glob(os.path.join(rawDir, "*.EBD")))
