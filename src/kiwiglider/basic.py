@@ -9,13 +9,14 @@ from tempfile import NamedTemporaryFile
 from itertools import groupby
 import yaml
 import logging
+from typing import Any
 from openpyxl import load_workbook
 from pyglider import slocum
 from pyglider.ncprocess import extract_timeseries_profiles
 from ioos_qc.config import Config
 from ioos_qc.streams import XarrayStream
 from ioos_qc.results import collect_results, ContextResult, CallResult
-from ioos_qc.qartod import aggregate, QartodFlags
+from ioos_qc.qartod import aggregate
 from ioos_qc.stores import PandasStore, column_from_collected_result
 from compliance_checker.runner import ComplianceChecker, CheckSuite
 import xarray as xr
@@ -24,71 +25,127 @@ from datetime import datetime
 import pygmt
 from utm import from_latlon
 from inspect import getmodule
-from kiwiglider.utils import dd2dm, dm2dd, temporary_cpt, first_nonnan, last_nonnan
+from kiwiglider.utils import dd2dm, temporary_cpt, first_nonnan, last_nonnan
 
 
 _log = logging.getLogger(__name__)
 
 
-def collect_excelsheet_metadata(excelsheet, ID=1):
-    """
-    extract Excel sheet metadata for given deployment ID
+def collect_excelsheet_metadata(
+        excelsheet: str, ID: int = 1
+) -> dict[str, list[str | int | float]]:
+    """Extract Excel sheet metadata for given deployment ID.
 
+    Note
+    ----
     First row of Excel sheet must contain descriptive column headers.
     First column of Excel sheet must contain deployment ID numbers.
+
+    Parameters
+    ----------
+    excelsheet : str
+        Path to Excel sheet with metadata
+    ID : int
+        Deployment number/ID to focus on
+
+    Returns
+    -------
+    dict[str, list[str | int | float]]
+        Excel sheet metadata from specified deployment
+
     """
     _log.info(f'Getting metadata from {excelsheet}')
 
     # load the Excel sheet
     worksheet = load_workbook(excelsheet).active
     # get header names (must be present in first row)
-    headers = [worksheet.cell(row=1, column=idx).value
-               for idx in range(2, worksheet.max_column+1)]
+    headers = [
+        worksheet.cell(row=1, column=idx).value
+        for idx in range(2, worksheet.max_column+1)
+    ]
     # get deployment numbers (must be present in first column)
-    deployments = [worksheet.cell(row=idx, column=1).value
-                   for idx in range(2, worksheet.max_row+1)]
+    deployments = [
+        worksheet.cell(row=idx, column=1).value
+        for idx in range(2, worksheet.max_row+1)
+    ]
 
     # return metadata from input deployment ID
-    return {headers[idx-2]: worksheet.cell(row=deployments.index(ID)+2,
-                                           column=idx).value
-            for idx in range(2, worksheet.max_column+1)}
+    return {
+        headers[idx-2]: worksheet.cell(
+            row=deployments.index(ID)+2, column=idx
+        ).value
+        for idx in range(2, worksheet.max_column+1)
+    }
 
 
 class DeploymentYAML():
+    """Contains deployment-specific metadata.
+
+    Parameters
+    ----------
+    ID : int, default = 1
+        Deployment number/ID to focus on
+
+    Attributes
+    ----------
+    ID : int
+        Deployment number/ID to focus on
+    excelsheet : str
+        Path to Excel sheet with metadata
+    excel_metadata : dict[str, list[str | int | float]]
+        Excel sheet metadata from specified deployment
+    metadata : dict
+        Global deployment metadata
+    glider_devices : dict
+        Installed instrument metadata
+    netcdf_variables : dict
+        NetCDF variable name mapping and metadata
+    profile_variables : dict
+        Profile-averaged variable metadata
+    qartod_tests : dict
+        QARTOD test parameters
+    yaml : dict
+        All metadata to go in YAML file
+    outname : str
+        Path to output YAML file
+
     """
-    class with methods to add metadata and write out deployment-specific YAML
-    for ingest into pyglider
-    """
-    def __init__(self, ID=1):
-        """
-        initialize the YAML with the deployment ID
-        """
+
+    def __init__(self, ID: int = 1):
         self.ID = ID
 
-    def add_excel_metadata(self, excelsheet, ID=None):
-        """
-        add DeploymentYAML.excel_metadata: Excel sheet metadata for given
-        deployment ID
+    def add_excel_metadata(self, excelsheet: str) -> None:
+        """Add Excel sheet metadata for given deployment ID.
 
-        supplying ID here will overwrite what was given during initialization
-
+        Note
+        ----
         First row of Excel sheet must contain descriptive column headers.
         First column of Excel sheet must contain deployment ID numbers.
+
+        Parameters
+        ----------
+        excelsheet : str
+            Path to Excel sheet with metadata
+
         """
 
         # assign input Excel sheet
         self.excelsheet = excelsheet
-        # if gave input, overwrite existing
-        if ID is not None:
-            self.ID = ID
 
         # get metadata from input deployment ID
-        self.excel_metadata = collect_excelsheet_metadata(self.excelsheet,
-                                                          self.ID)
+        self.excel_metadata = collect_excelsheet_metadata(
+            self.excelsheet, self.ID
+        )
 
-    def add_metadata(self, metadata=None):
-        """
-        add DeploymentYAML.metadata: global variables for NetCDF
+    def add_metadata(self, metadata: dict[str, Any] = None) -> None:
+        """Add global deployment metadata.
+
+        Parameters
+        ----------
+        metadata : dict[str, Any], optional
+            Global attributes to overwrite default
+            in form {'attribute':value}
+
         """
         _log.info('Adding global metadata to deployment YAML')
 
@@ -150,10 +207,10 @@ class DeploymentYAML():
         self._add_meta('deployment_name', 'GLD{:04d}'.format(self.ID))
         self._add_meta('deployment_start',
                        self.excel_metadata['deploy_date'].strftime('%Y-%m-%d'))
-        # note will be overwritten in nc by pyglider
+        # note: will be overwritten in nc by pyglider
         self._add_meta('deployment_end',
                        self.excel_metadata['end_date'].strftime('%Y-%m-%d'))
-        # note will be overwritten in nc by pyglider
+        # note: will be overwritten in nc by pyglider
         self._add_meta('glider_name', self.excel_metadata['platform_id'])
         self._add_meta('glider_serial',
                        f'{self.excel_metadata['platform_sn']}')
@@ -178,9 +235,18 @@ class DeploymentYAML():
             for name, value in metadata.items():
                 self._add_meta(name, value)
 
-    def add_glider_devices(self, glider_devices=None):
-        """
-        add DeploymentYAML.glider_devices: metadata for installed instruments
+    def add_glider_devices(
+            self,
+            glider_devices: dict[str, dict[str, Any]] = None
+    ) -> None:
+        """Add installed instrument metadata.
+
+        Parameters
+        ----------
+        glider_devices : dict[str, dict[str, Any]], optional
+            Glider device metadata to overwrite default
+            in form {'device_name': {'attribute': value}}
+
         """
         _log.info('Adding glider device metadata to deployment YAML')
 
@@ -287,13 +353,18 @@ class DeploymentYAML():
             for name, value in glider_devices.items():
                 self._add_glider_device(name, value)
 
-    def add_netcdf_variables(self, netcdf_variables=None):
-        """
-        add DeploymentYAML.netcdf_variables: metadata for translating glider
-        variables to NetCDF variables
+    def add_netcdf_variables(
+            self,
+            netcdf_variables: dict[str, dict[str, Any]] = None
+    ) -> None:
+        """Add NetCDF variable translations and metadata.
 
-        supplying metadata here will overwrite what was given during
-        initialization
+        Parameters
+        ----------
+        netcdf_variables : dict[str, dict[str, Any]], optional
+            NetCDF variable name mapping and metadata to overwrite default
+            in form {'variable_name': {'attribute': value}
+
         """
         _log.info('Adding variable metadata to deployment YAML')
 
@@ -303,235 +374,232 @@ class DeploymentYAML():
         # initialize common variables
         self.netcdf_variables = {
             'time': {
-                'source':           'sci_m_present_time',
-                'long_name':        'Time',
-                'standard_name':    'time',
-                'calendar':         'gregorian',
-                'units':            'seconds since 1970-01-01T00:00:00Z',
+                'source': 'sci_m_present_time',
+                'long_name': 'Time',
+                'standard_name': 'time',
+                'calendar': 'gregorian',
+                'units': 'seconds since 1970-01-01T00:00:00Z',
                 'observation_type': 'measured'
             },
             'latitude': {
-                'source':           'm_gps_lat',
-                'long_name':        'Latitude',
-                'standard_name':    'latitude',
-                'units':            'degrees_north',
-                'comment':          'Estimated between surface fixes',
+                'source': 'm_gps_lat',
+                'long_name': 'Latitude',
+                'standard_name': 'latitude',
+                'units': 'degrees_north',
+                'comment': 'Estimated between surface fixes',
                 'observation_type': 'measured',
-                'platform':         'platform',
-                'reference':        'WGS84',
-                'valid_max':        90.0,
-                'valid_min':        -90.0,
-                '_FillValue':       -999.0,
-                'coordinate_reference_frame':  'urn:ogc:crs:EPSG::4326'
+                'platform': 'platform',
+                'reference': 'WGS84',
+                'valid_max': 90.0,
+                'valid_min': -90.0,
+                '_FillValue': -999.0,
+                'coordinate_reference_frame': 'urn:ogc:crs:EPSG::4326'
             },
             'longitude': {
-                'source':           'm_gps_lon',
-                'long_name':        'Longitude',
-                'standard_name':    'longitude',
-                'units':            'degrees_east',
-                'comment':          'Estimated between surface fixes',
+                'source': 'm_gps_lon',
+                'long_name': 'Longitude',
+                'standard_name': 'longitude',
+                'units': 'degrees_east',
+                'comment': 'Estimated between surface fixes',
                 'observation_type': 'measured',
-                'platform':         'platform',
-                'reference':        'WGS84',
-                'valid_max':        180.0,
-                'valid_min':        -180.0,
-                '_FillValue':       -999.0,
-                'coordinate_reference_frame':  'urn:ogc:crs:EPSG::4326'
+                'platform': 'platform',
+                'reference': 'WGS84',
+                'valid_max': 180.0,
+                'valid_min': -180.0,
+                '_FillValue': -999.0,
+                'coordinate_reference_frame': 'urn:ogc:crs:EPSG::4326'
             },
             'heading': {
-                'source':           'm_heading',
-                'long_name':        'Glider Heading Angle',
-                'standard_name':    'platform_orientation',
-                'units':            'rad',
-                '_FillValue':       -999.0
+                'source': 'm_heading',
+                'long_name': 'Glider Heading Angle',
+                'standard_name': 'platform_orientation',
+                'units': 'rad',
+                '_FillValue': -999.0
             },
             'pitch': {
-                'source':           'm_pitch',
-                'long_name':        'Glider Pitch Angle',
-                'standard_name':    'platform_pitch_angle',
-                'units':            'rad',
-                '_FillValue':       -999.0
+                'source': 'm_pitch',
+                'long_name': 'Glider Pitch Angle',
+                'standard_name': 'platform_pitch_angle',
+                'units': 'rad',
+                '_FillValue': -999.0
             },
             'roll': {
-                'source':           'm_roll',
-                'long_name':        'Glider Roll Angle',
-                'standard_name':    'platform_roll_angle',
-                'units':            'rad',
-                '_FillValue':       -999.0
+                'source': 'm_roll',
+                'long_name': 'Glider Roll Angle',
+                'standard_name': 'platform_roll_angle',
+                'units': 'rad',
+                '_FillValue': -999.0
             },
             'conductivity': {
-                'source':           'sci_water_cond',
-                'long_name':        'Conductivity',
-                'standard_name':    'sea_water_electrical_conductivity',
-                'units':            'S m-1',
-                'instrument':       'instrument_ctd',
-                'valid_min':        0.0,
-                'valid_max':        10.0,
-                '_FillValue':       -999.0,
+                'source': 'sci_water_cond',
+                'long_name': 'Conductivity',
+                'standard_name': 'sea_water_electrical_conductivity',
+                'units': 'S m-1',
+                'instrument': 'instrument_ctd',
+                'valid_min': 0.0,
+                'valid_max': 10.0,
+                '_FillValue': -999.0,
                 'observation_type': 'measured',
-                'accuracy':         0.0003,
-                'precision':        0.0001,
-                'resolution':       0.00002
+                'accuracy': 0.0003,
+                'precision': 0.0001,
+                'resolution': 0.00002
             },
             'temperature': {
-                'source':           'sci_water_temp',
-                'long_name':        'Temperature',
-                'standard_name':    'sea_water_temperature',
-                'units':            'Celsius',
-                'instrument':       'instrument_ctd',
-                'valid_min':        -5.0,
-                'valid_max':        50.0,
-                '_FillValue':       -999.0,
+                'source': 'sci_water_temp',
+                'long_name': 'Temperature',
+                'standard_name': 'sea_water_temperature',
+                'units': 'Celsius',
+                'instrument': 'instrument_ctd',
+                'valid_min': -5.0,
+                'valid_max': 50.0,
+                '_FillValue': -999.0,
                 'observation_type': 'measured',
-                'accuracy':         0.002,
-                'precision':        0.001,
-                'resolution':       0.0002
+                'accuracy': 0.002,
+                'precision': 0.001,
+                'resolution': 0.0002
             },
             'pressure': {
-                'source':           'sci_water_pressure',
-                'long_name':        'Pressure',
-                'standard_name':    'sea_water_pressure',
-                'units':            'dbar',
-                'conversion':       'bar2dbar',
-                'valid_min':        0.0,
-                'valid_max':        2000.0,
-                '_FillValue':       -999.0,
-                'positive':         'down',
-                'reference_datum':  'sea-surface',
-                'instrument':       'instrument_ctd',
+                'source': 'sci_water_pressure',
+                'long_name': 'Pressure',
+                'standard_name': 'sea_water_pressure',
+                'units': 'dbar',
+                'conversion': 'bar2dbar',
+                'valid_min': 0.0,
+                'valid_max': 2000.0,
+                '_FillValue': -999.0,
+                'positive': 'down',
+                'reference_datum': 'sea-surface',
+                'instrument': 'instrument_ctd',
                 'observation_type': 'measured',
-                'accuracy':         1.0,
-                'precision':        2.0,
-                'resolution':       0.02,
-                'comment':          'ctd pressure sensor'
+                'accuracy': 1.0,
+                'precision': 2.0,
+                'resolution': 0.02,
+                'comment': 'ctd pressure sensor'
             },
             'water_velocity_eastward': {
-                'source':           'm_water_vx',
-                'long_name':        'Depth-Averaged Eastward Sea Water ' +
-                                    'Velocity',
-                'standard_name':    'barotropic_eastward_sea_water_velocity',
-                'units':            'm s-1',
-                '_FillValue':       -999.0
+                'source': 'm_water_vx',
+                'long_name': 'Depth-Averaged Eastward Sea Water Velocity',
+                'standard_name': 'barotropic_eastward_sea_water_velocity',
+                'units': 'm s-1',
+                '_FillValue': -999.0
             },
             'water_velocity_northward': {
-                'source':           'm_water_vy',
-                'long_name':        'Depth-Averaged Northward Sea Water ' +
-                                    'Velocity',
-                'standard_name':    'barotropic_northward_sea_water_velocity',
-                'units':            'm s-1',
-                '_FillValue':       -999.0
+                'source': 'm_water_vy',
+                'long_name': 'Depth-Averaged Northward Sea Water Velocity',
+                'standard_name': 'barotropic_northward_sea_water_velocity',
+                'units': 'm s-1',
+                '_FillValue': -999.0
             }
         }
 
         # add based on devices present in Excel worksheet metadata
         if self.excel_metadata['wetlabs_installed']:
             self._add_netcdf_variable('chlorophyll', {
-                'source':           'sci_flbbcd_chlor_units',
-                'long_name':        'Chlorophyll',
-                'standard_name':    'concentration_of_chlorophyll_' +
-                                    'in_sea_water',
-                'units':            'mg m-3',
-                'valid_min':        0.0,
-                'valid_max':        50.0,
-                '_FillValue':       -999.0,
-                'resolution':       0.007
+                'source': 'sci_flbbcd_chlor_units',
+                'long_name': 'Chlorophyll',
+                'standard_name': 'concentration_of_chlorophyll_in_sea_water',
+                'units': 'mg m-3',
+                'valid_min': 0.0,
+                'valid_max': 50.0,
+                '_FillValue': -999.0,
+                'resolution': 0.007
             })
             self._add_netcdf_variable('cdom', {
-                'source':           'sci_flbbcd_cdom_units',
-                'long_name':        'Colored Dissolved Organic Matter',
-                'units':            'ppb',
-                'valid_min':        0.0,
-                'valid_max':        375.0,
-                '_FillValue':       -999.0,
-                'resolution':       0.08
+                'source': 'sci_flbbcd_cdom_units',
+                'long_name': 'Colored Dissolved Organic Matter',
+                'units': 'ppb',
+                'valid_min': 0.0,
+                'valid_max': 375.0,
+                '_FillValue': -999.0,
+                'resolution': 0.08
             })
             self._add_netcdf_variable('backscatter_700', {
-                'source':           'sci_flbbcd_bb_units',
-                'long_name':        '700 nm Wavelength Backscatter',
-                'units':            "1",
-                'valid_min':        0.0,
-                'valid_max':        5.0,
-                '_FillValue':       -999.0,
-                'resolution':       0.000002
+                'source': 'sci_flbbcd_bb_units',
+                'long_name': '700 nm Wavelength Backscatter',
+                'units': "1",
+                'valid_min': 0.0,
+                'valid_max': 5.0,
+                '_FillValue': -999.0,
+                'resolution': 0.000002
             })
         if self.excel_metadata['oxy_installed']:
             self._add_netcdf_variable('oxygen_concentration', {
-                'source':           'sci_oxy4_oxygen',
-                'long_name':        'Oxygen Concentration',
-                'standard_name':    'mole_concentration_of_dissolved_' +
-                                    'molecular_oxygen_in_sea_water',
-                'units':            'umol l-1',
-                'valid_min':        0.0,
-                'valid_max':        500.0,
-                '_FillValue':       -999.0,
-                'accuracy':         8.0,
-                'resolution':       1.0
+                'source': 'sci_oxy4_oxygen',
+                'long_name': 'Oxygen Concentration',
+                'standard_name': 'mole_concentration_of_dissolved_' +
+                                 'molecular_oxygen_in_sea_water',
+                'units': 'umol l-1',
+                'valid_min': 0.0,
+                'valid_max': 500.0,
+                '_FillValue': -999.0,
+                'accuracy': 8.0,
+                'resolution': 1.0
             })
         if self.excel_metadata['par_installed']:
             self._add_netcdf_variable('par', {
-                'source':           'sci_bsipar_par',
-                'long_name':        'Photosynthetically Active Radiation',
-                'standard_name':    'downwelling_photosynthetic_photon_' +
-                                    'spherical_irradiance_in_sea_water',
-                'units':            'umol m-2 s-1',
-                'valid_min':         0.0,
-                'valid_max':         6000.0,
-                '_FillValue':       -999.0
+                'source': 'sci_bsipar_par',
+                'long_name': 'Photosynthetically Active Radiation',
+                'standard_name': 'downwelling_photosynthetic_photon_' +
+                                 'spherical_irradiance_in_sea_water',
+                'units': 'umol m-2 s-1',
+                'valid_min': 0.0,
+                'valid_max': 6000.0,
+                '_FillValue': -999.0
             })
         if self.excel_metadata['bb3_installed']:
             self._add_netcdf_variable('backscatter_470', {
-                'source':           'sci_bb3slo_b470_scaled',
-                'long_name':        '470 nm Wavelength Backscatter',
-                'units':            "1",
-                'valid_min':        0.0,
-                'valid_max':        5.0,
-                '_FillValue':       -999.0,
-                'resolution':       0.00001
+                'source': 'sci_bb3slo_b470_scaled',
+                'long_name': '470 nm Wavelength Backscatter',
+                'units': "1",
+                'valid_min': 0.0,
+                'valid_max': 5.0,
+                '_FillValue': -999.0,
+                'resolution': 0.00001
             })
             self._add_netcdf_variable('backscatter_532', {
-                'source':           'sci_bb3slo_b532_scaled',
-                'long_name':        '532 nm Wavelength Backscatter',
-                'units':            "1",
-                'valid_min':        0.0,
-                'valid_max':        5.0,
-                '_FillValue':       -999.0,
-                'resolution':       0.000006
+                'source': 'sci_bb3slo_b532_scaled',
+                'long_name': '532 nm Wavelength Backscatter',
+                'units': "1",
+                'valid_min': 0.0,
+                'valid_max': 5.0,
+                '_FillValue': -999.0,
+                'resolution': 0.000006
             })
             self._add_netcdf_variable('backscatter_660', {
-                'source':           'sci_bb3slo_b660_scaled',
-                'long_name':        '660 nm Wavelength Backscatter',
-                'units':            "1",
-                'valid_min':        0.0,
-                'valid_max':        5.0,
-                '_FillValue':       -999.0,
-                'resolution':       0.0000035
+                'source': 'sci_bb3slo_b660_scaled',
+                'long_name': '660 nm Wavelength Backscatter',
+                'units': "1",
+                'valid_min': 0.0,
+                'valid_max': 5.0,
+                '_FillValue': -999.0,
+                'resolution': 0.0000035
             })
         if self.excel_metadata['lisst_installed']:
             self._add_netcdf_variable('total_volume_concentration', {
-                'source':           'sci_lisst_totvol',
-                'long_name':        'Total Volume Concentration of Particles',
-                'units':            'uL L-1',
-                'valid_min':        0.5,
-                'valid_max':        700,
-                '_FillValue':       -999.0,
-                'resolution':       0.1
+                'source': 'sci_lisst_totvol',
+                'long_name': 'Total Volume Concentration of Particles',
+                'units': 'uL L-1',
+                'valid_min': 0.5,
+                'valid_max': 700,
+                '_FillValue': -999.0,
+                'resolution': 0.1
             })
             self._add_netcdf_variable('mean_size', {
-                'source':           'sci_lisst_meansize',
-                'long_name':        'Mean Particle Size',
-                'units':            'um',
-                'valid_min':        1.0,
-                'valid_max':        500,
-                '_FillValue':       -999.0
+                'source': 'sci_lisst_meansize',
+                'long_name': 'Mean Particle Size',
+                'units': 'um',
+                'valid_min': 1.0,
+                'valid_max': 500,
+                '_FillValue': -999.0
             })
             self._add_netcdf_variable('beam_attenuation', {
-                'source':           'sci_lisst_beamc',
-                'long_name':        'Beam Attenuation',
-                'units':            'm-1',
-                'valid_min':        0.3,
-                'valid_max':        0.99,
-                '_FillValue':       -999.0,
-                'resolution':       0.1
+                'source': 'sci_lisst_beamc',
+                'long_name': 'Beam Attenuation',
+                'units': 'm-1',
+                'valid_min': 0.3,
+                'valid_max': 0.99,
+                '_FillValue': -999.0,
+                'resolution': 0.1
             })
 
         # add from user input (overwrite as necessary)
@@ -539,10 +607,18 @@ class DeploymentYAML():
             for name, value in netcdf_variables.items():
                 self._add_netcdf_variable(name, value)
 
-    def add_profile_variables(self, profile_variables=None):
-        """
-        add DeploymentYAML.profile_variables: metadata for
-        profile-averaged variables
+    def add_profile_variables(
+            self,
+            profile_variables: dict[str, dict[str, Any]] = None
+    ):
+        """Add profile-averaged variable metadata
+
+        Parameters
+        ----------
+        profile_variables : dict[str, dict[str, Any]], optional
+            Profile-averaged variable metadata to overwrite default
+            in form {'variable_name': {'attribute': value}}
+
         """
         _log.info('Adding profile variable metadata to deployment YAML')
 
@@ -552,162 +628,160 @@ class DeploymentYAML():
         # initialize
         self.profile_variables = {
             'profile_id': {
-                'comment':          'Sequential profile number within the ' +
-                                    'trajectory.  This value is unique in ' +
-                                    'each file that is part of a single ' +
-                                    'trajectory/deployment.',
-                'long_name':        'Profile ID',
-                'valid_max':        2147483647,
-                'valid_min':        1,
-                '_FillValue':       -999.0
+                'comment': 'Sequential profile number within the ' +
+                           'trajectory.  This value is unique in ' +
+                           'each file that is part of a single ' +
+                           'trajectory/deployment.',
+                'long_name': 'Profile ID',
+                'valid_max': 2147483647,
+                'valid_min': 1,
+                '_FillValue': -999.0
             },
             'profile_time': {
-                'comment':          'Timestamp corresponding to the mid-' +
-                                    'point of the profile',
-                'long_name':        'Profile Center Time',
+                'comment': 'Timestamp corresponding to the mid-' +
+                           'point of the profile',
+                'long_name': 'Profile Center Time',
                 'observation_type': 'calculated',
-                'platform':         'platform',
-                'standard_name':    'time',
-                '_FillValue':       -999.0
+                'platform': 'platform',
+                'standard_name': 'time',
+                '_FillValue': -999.0
             },
             'profile_time_start': {
-                'comment':          'Timestamp corresponding to the start ' +
-                                    'of the profile',
-                'long_name':        'Profile Start Time',
+                'comment': 'Timestamp corresponding to the start ' +
+                           'of the profile',
+                'long_name': 'Profile Start Time',
                 'observation_type': 'calculated',
-                'platform':         'platform',
-                'standard_name':    'time',
-                '_FillValue':       -999.0
+                'platform': 'platform',
+                'standard_name': 'time',
+                '_FillValue': -999.0
             },
             'profile_time_end': {
-                'comment':          'Timestamp corresponding to the end of ' +
-                                    'the profile',
-                'long_name':        'Profile End Time',
+                'comment': 'Timestamp corresponding to the end of ' +
+                           'the profile',
+                'long_name': 'Profile End Time',
                 'observation_type': 'calculated',
-                'platform':         'platform',
-                'standard_name':    'time',
-                '_FillValue':       -999.0
+                'platform': 'platform',
+                'standard_name': 'time',
+                '_FillValue': -999.0
             },
             'profile_lat': {
-                'comment':          'Value is interpolated to provide an ' +
-                                    'estimate of the latitude at the ' +
-                                    'mid-point of the profile',
-                'long_name':        'Profile Center Latitude',
+                'comment': 'Value is interpolated to provide an ' +
+                           'estimate of the latitude at the ' +
+                           'mid-point of the profile',
+                'long_name': 'Profile Center Latitude',
                 'observation_type': 'calculated',
-                'platform':         'platform',
-                'standard_name':    'latitude',
-                'units':            'degrees_north',
-                'valid_max':        90.0,
-                'valid_min':        -90.0,
-                '_FillValue':       -999.0
+                'platform': 'platform',
+                'standard_name': 'latitude',
+                'units': 'degrees_north',
+                'valid_max': 90.0,
+                'valid_min': -90.0,
+                '_FillValue': -999.0
             },
             'profile_lon': {
-                'comment':          'Value is interpolated to provide an ' +
-                                    'estimate of the longitude at the ' +
-                                    'mid-point of the profile',
-                'long_name':        'Profile Center Longitude',
+                'comment': 'Value is interpolated to provide an ' +
+                           'estimate of the longitude at the ' +
+                           'mid-point of the profile',
+                'long_name': 'Profile Center Longitude',
                 'observation_type': 'calculated',
-                'platform':         'platform',
-                'standard_name':    'longitude',
-                'units':            'degrees_east',
-                'valid_max':        180.0,
-                'valid_min':        -180.0,
-                '_FillValue':       -999.0
+                'platform': 'platform',
+                'standard_name': 'longitude',
+                'units': 'degrees_east',
+                'valid_max': 180.0,
+                'valid_min': -180.0,
+                '_FillValue': -999.0
             },
             'u': {
-                'comment':          'The depth-averaged current is an ' +
-                                    'estimate of the net current measured ' +
-                                    'while the glider is underwater. The ' +
-                                    'value is calculated over the entire ' +
-                                    'underwater segment, which may ' +
-                                    'consist of 1 or more dives.',
-                'long_name':        'Depth-Averaged Eastward Sea Water ' +
-                                    'Velocity',
+                'comment': 'The depth-averaged current is an ' +
+                           'estimate of the net current measured ' +
+                           'while the glider is underwater. The ' +
+                           'value is calculated over the entire ' +
+                           'underwater segment, which may ' +
+                           'consist of 1 or more dives.',
+                'long_name': 'Depth-Averaged Eastward Sea Water Velocity',
                 'observation_type': 'calculated',
-                'platform':         'platform',
-                'standard_name':    'eastward_sea_water_velocity',
-                'units':            'm s-1',
-                'valid_max':        10.0,
-                'valid_min':        -10.0,
-                '_FillValue':       -999.0
+                'platform': 'platform',
+                'standard_name': 'eastward_sea_water_velocity',
+                'units': 'm s-1',
+                'valid_max': 10.0,
+                'valid_min': -10.0,
+                '_FillValue': -999.0
             },
             'v': {
-                'comment':          'The depth-averaged current is an ' +
-                                    'estimate of the net current measured ' +
-                                    'while the glider is underwater. The ' +
-                                    'value is calculated over the entire ' +
-                                    'underwater segment, which may ' +
-                                    'consist of 1 or more dives.',
-                'long_name':        'Depth-Averaged Northward Sea Water ' +
-                                    'Velocity',
+                'comment': 'The depth-averaged current is an ' +
+                           'estimate of the net current measured ' +
+                           'while the glider is underwater. The ' +
+                           'value is calculated over the entire ' +
+                           'underwater segment, which may ' +
+                           'consist of 1 or more dives.',
+                'long_name': 'Depth-Averaged Northward Sea Water Velocity',
                 'observation_type': 'calculated',
-                'platform':         'platform',
-                'standard_name':    'northward_sea_water_velocity',
-                'units':            'm s-1',
-                'valid_max':        10.0,
-                'valid_min':        -10.0,
-                '_FillValue':       -999.0
+                'platform': 'platform',
+                'standard_name': 'northward_sea_water_velocity',
+                'units': 'm s-1',
+                'valid_max': 10.0,
+                'valid_min': -10.0,
+                '_FillValue': -999.0
             },
             'lon_uv': {
-                'comment':          'The depth-averaged current is an ' +
-                                    'estimate of the net current measured ' +
-                                    'while the glider is underwater. The ' +
-                                    'value is calculated over the entire ' +
-                                    'underwater segment, which may ' +
-                                    'consist of 1 or more dives.',
-                'long_name':        'Depth-Averaged Longitude',
+                'comment': 'The depth-averaged current is an ' +
+                           'estimate of the net current measured ' +
+                           'while the glider is underwater. The ' +
+                           'value is calculated over the entire ' +
+                           'underwater segment, which may ' +
+                           'consist of 1 or more dives.',
+                'long_name': 'Depth-Averaged Longitude',
                 'observation_type': 'calculated',
-                'platform':         'platform',
-                'standard_name':    'longitude',
-                'units':            'degrees_east',
-                'valid_max':        180.0,
-                'valid_min':        -180.0,
-                '_FillValue':       -999.0
+                'platform': 'platform',
+                'standard_name': 'longitude',
+                'units': 'degrees_east',
+                'valid_max': 180.0,
+                'valid_min': -180.0,
+                '_FillValue': -999.0
             },
             'lat_uv': {
-                'comment':          'The depth-averaged current is an ' +
-                                    'estimate of the net current measured ' +
-                                    'while the glider is underwater.  The ' +
-                                    'value is calculated over the entire ' +
-                                    'underwater segment, which may ' +
-                                    'consist of 1 or more dives.',
-                'long_name':        'Depth-Averaged Latitude',
+                'comment': 'The depth-averaged current is an ' +
+                           'estimate of the net current measured ' +
+                           'while the glider is underwater.  The ' +
+                           'value is calculated over the entire ' +
+                           'underwater segment, which may ' +
+                           'consist of 1 or more dives.',
+                'long_name': 'Depth-Averaged Latitude',
                 'observation_type': 'calculated',
-                'platform':         'platform',
-                'standard_name':    'latitude',
-                'units':            'degrees_north',
-                'valid_max':        90.0,
-                'valid_min':        -90.0,
-                '_FillValue':       -999.0
+                'platform': 'platform',
+                'standard_name': 'latitude',
+                'units': 'degrees_north',
+                'valid_max': 90.0,
+                'valid_min': -90.0,
+                '_FillValue': -999.0
             },
             'time_uv': {
-                'comment':          'The depth-averaged current is an ' +
-                                    'estimate of the net current measured ' +
-                                    'while the glider is underwater.  The ' +
-                                    'value is calculated over the entire ' +
-                                    'underwater segment, which may ' +
-                                    'consist of 1 or more dives.',
-                'long_name':        'Depth-Averaged Time',
-                'standard_name':    'time',
-                'calendar':         'gregorian',
-                'units':            'seconds since 1970-01-01T00:00:00Z',
+                'comment': 'The depth-averaged current is an ' +
+                           'estimate of the net current measured ' +
+                           'while the glider is underwater.  The ' +
+                           'value is calculated over the entire ' +
+                           'underwater segment, which may ' +
+                           'consist of 1 or more dives.',
+                'long_name': 'Depth-Averaged Time',
+                'standard_name': 'time',
+                'calendar': 'gregorian',
+                'units': 'seconds since 1970-01-01T00:00:00Z',
                 'observation_type': 'calculated',
-                '_FillValue':       -999.0
+                '_FillValue': -999.0
             },
             'instrument_ctd': {
-                'comment':    'pumped CTD',
+                'comment': 'pumped CTD',
                 'calibration_date':
                 self.excel_metadata['ctd_cal'].strftime('%Y-%m-%dT%H:%M:%SZ'),
-                'calibration_report':   '" "',
+                'calibration_report': '" "',
                 'factory_calibrated':
                 self.excel_metadata['ctd_cal'].strftime('%Y-%m-%dT%H:%M:%SZ'),
-                'long_name':           'Seabird Glider Payload CTD',
-                'make_model':          'Seabird ' +
+                'long_name': 'Seabird Glider Payload CTD',
+                'make_model': 'Seabird ' +
                 self.excel_metadata['ctd_type'],
-                'platform':            'platform',
-                'serial_number':       f'{self.excel_metadata['ctd_sn']}',
-                'type':                'platform',
-                '_FillValue':          -999.0
+                'platform': 'platform',
+                'serial_number': f'{self.excel_metadata['ctd_sn']}',
+                'type': 'platform',
+                '_FillValue': -999.0
             },
         }
 
@@ -716,20 +790,35 @@ class DeploymentYAML():
             for name, value in profile_variables.items():
                 self._add_profile_variable(name, value)
 
-    def add_qartod_tests(self, qartod_tests=None):
-        """
-        add DeploymentYAML.qartod_tests: metadata for QARTOD tests to perform
-            gross range tests to variables with valid_min, valid_max in
-            netcdf_variables spike, rate of change, and flat line tests to
-            variables with resolution in netcdf_variables
+    def add_qartod_tests(
+            self,
+            qartod_tests:
+            dict[str, dict[str, dict[str, Any]]] = None
+    ) -> None:
+        """Add QARTOD test parameters
+
+        Note
+        ----
+        Gross Range Tests use NetCDF variable valid_min, valid_max.
+
+        Spike, Rate of Change, and Flat Line Tests use
+        NetCDF variable resolution.
+
+        Parameters
+        ----------
+        qartod_tests : dict[str, dict[str, dict[str, Any]]], optional
+            QARTOD test parameters to overwrite default in form
+            {'variable_name': {'test_name': {'parameter_name': value}}}
+
         """
         _log.info('Adding QARTOD test metadata to deployment YAML')
 
         # if don't have NetCDF variable metadata already
         if not hasattr(self, 'netcdf_variables'):
-            raise AttributeError('Must have NetCDF variable metadata to ' +
-                                 'construct YAML. See method add_netcdf_' +
-                                 'variables')
+            raise AttributeError(
+                'Must have NetCDF variable metadata to construct YAML. ' +
+                'See method add_netcdf_variables'
+            )
 
         # initialize with instrument limits
         for variable in self.netcdf_variables:
@@ -771,31 +860,47 @@ class DeploymentYAML():
                 for test, parameters in test_parameters.items():
                     self._add_qartod_test(variable, test, parameters)
 
-    def construct_yaml(self, excelsheet=None, ID=None, qartod_tests=None,
-                       metadata=None, glider_devices=None,
-                       netcdf_variables=None, profile_variables=None):
-        """
-        use Excel sheet output to build YAML output
+    def construct_yaml(
+            self,
+            excelsheet: str = None,
+            metadata: dict[str, dict[str, Any]] = None,
+            glider_devices: dict[str, dict[str, Any]] = None,
+            netcdf_variables: dict[str, dict[str, Any]] = None,
+            profile_variables: dict[str, dict[str, Any]] = None,
+            qartod_tests: dict[str, dict[str, dict[str, Any]]] | bool = None
+    ) -> None:
+        """Use Excel sheet output to build YAML output.
 
-        provide deployment ID during initialization of DeploymentYAML class or
-        provide it here.
-        additionally provide metadata, glider_devices,netcdf_variables,
-        profile_variables in form {'name':value} to overwrite or add to
-        default values
-        qartod_tests=False will skip adding tests
-        additionally provide qartod_tests in form
-        {'variable':{'test':parameters}} to add additional tests
+        Note
+        ----
+        Method is intended to replace calling other methods individually: if
+        other methods called previously, inputs here will overwrite the results
 
-        supplying inputs here will overwrite what was given during
-        initialization or during any previous individually called steps
+        Paramters
+        ---------
+        excelsheet : str, optional
+            Path to Excel sheet with metadata
+        metadata : dict[str, dict[str, Any]], optional
+            Global attributes to overwrite default
+            in form {'attribute':value}
+        glider_devices : dict[str, dict[str, Any]], optional
+            Glider device metadata to overwrite default
+            in form {'device_name': {'attribute': value}}
+        netcdf_variables : dict[str, dict[str, Any]], optional
+            NetCDF variable name mapping and metadata to overwrite default
+            in form {'variable_name': {'attribute': value}
+        profile_variables : dict[str, dict[str, Any]], optional
+            Profile-averaged variable metadata to overwrite default
+            in form {'variable_name': {'attribute': value}}
+        qartod_tests : dict[str, dict[str, dict[str, Any]]] | bool, optional
+            QARTOD test parameters to overwrite default in form
+            {'variable_name': {'test_name': {'parameter_name': value}}}
+            or specify False to skip adding QARTOD tests
+
         """
         # if gave inputs, overwrite any previous/assign
         if excelsheet is not None:
             self.excelsheet = excelsheet
-            if hasattr(self, 'excel_metadata'):
-                delattr(self, 'excel_metadata')
-        if ID is not None:
-            self.ID = ID
             if hasattr(self, 'excel_metadata'):
                 delattr(self, 'excel_metadata')
         if qartod_tests is not None:
@@ -866,9 +971,14 @@ class DeploymentYAML():
         if hasattr(self, 'qartod_tests'):
             self.yaml['qartod_tests'] = self.qartod_tests
 
-    def write_yaml(self, outname='deployment_metadata.yml'):
-        """
-        write yaml dictionary to YAML file
+    def write_yaml(self, outname: str = 'deployment_metadata.yml') -> None:
+        """Write yaml dictionary to YAML file.
+
+        Parameters
+        ----------
+        outname : str, optional
+            Full path to YAML file to write
+
         """
         # assign input
         self.outname = outname
@@ -876,7 +986,7 @@ class DeploymentYAML():
         # make sure have necessary variables
         if not hasattr(self, 'yaml'):
             raise AttributeError('Must have constructed an output yaml ' +
-                                 'dictionary. See method construct_yaml')
+                                 'dictionary. See method `construct_yaml`')
 
         # write out
         _log.info(f'Wrting deployment YAML for {self.ID} as {self.outname}')
@@ -884,9 +994,12 @@ class DeploymentYAML():
             yaml.dump(self.yaml, outfile, default_flow_style=False)
 
     def _check_for_excel_meta(self):
-        """
-        check to make sure there is Excel metadata already loaded
-        internal; used by many steps
+        """Check for Excel metadata already loaded.
+
+        Note
+        ----
+        Internal; used by many steps
+
         """
         _log.debug('Checking for existing Excel worksheet metadata')
         # if don't have Excel sheet metadata already
@@ -895,59 +1008,107 @@ class DeploymentYAML():
                                  'to construct YAML. See method ' +
                                  'collect_excelsheet_metadata')
 
-    def _add_meta(self, name, value):
-        """
-        add to dictionary of metadata in DeploymentYAML
-        internal; DeploymentYAML.metadata fills after getting metadata
-        from Excel sheet or inputing additional 'metadata'
+    def _add_meta(self, name: str, value: Any):
+        """Add to dictionary of metadata.
+
+        Note
+        ----
+        Internal; `metadata` attribute fills in public methods
+
+        Parameters
+        ----------
+        name : str
+            Attribute name
+        value : Any
+            Attribute value
+
         """
         _log.debug(f'Adding {name} to metadata')
         self.metadata[name] = value
 
-    def _add_glider_device(self, name, value):
-        """
-        add to dictionary of device metadata in DeploymentYAML
-        internal; DeploymentYAML.glider_devices fills after getting metadata
-        from Excel sheet or inputing additional 'glider_devices'
+    def _add_glider_device(self, name: str, value: Any):
+        """Add to dictionary of device metadata.
+
+        Note
+        ----
+        Internal; `glider_devices` attribute fills in public methods
+
+        Parameters
+        ----------
+        name : str
+            Attribute name
+        value : Any
+            Attribute value
+
         """
         _log.debug(f'Adding {name} to device metadata')
         self.glider_devices[name] = value
 
-    def _add_netcdf_variable(self, name, value):
-        """
-        add to dictionary of variable mapping metadata in DeploymentYAML
-        internal; DeploymentYAML.netcdf_variables fills after getting metadata
-        from Excel sheet or inputing additional 'netcdf_variables'
+    def _add_netcdf_variable(self, name: str, value: Any):
+        """Add to dictionary of variable mapping metadata.
+
+        Note
+        ----
+        Internal; `netcdf_variables` attribute fills in public methods
+
+        Parameters
+        ----------
+        name : str
+            Attribute name
+        value : Any
+            Attribute value
+
         """
         _log.debug(f'Adding {name} to variable mapping metadata')
         self.netcdf_variables[name] = value
 
-    def _add_profile_variable(self, name, value):
-        """
-        add to dictionary of profile variable mapping metadata in
-        DeploymentYAML
-        internal; DeploymentYAML.profile_variables fills after getting
-        metadata from Excel sheet or inputing additional 'profile_variables'
+    def _add_profile_variable(self, name: str, value: Any):
+        """Add to dictionary of profile variable mapping metadata.
+
+        Note
+        ----
+        Internal; `profile_variables` attribute fills in public methods
+
+        Parameters
+        ----------
+        name : str
+            Attribute name
+        value : Any
+            Attribute value
+
         """
         _log.debug(f'Adding {name} to profile variable mapping metadata')
         self.profile_variables[name] = value
 
-    def _add_qartod_test(self, variable, test, parameters):
-        """
-        add to dictionary of QARTOD tests to perform in DeploymentYAML
-        internal; DeploymentYAML.qartod_tests fills if given input
-        'qartod_tests' (or if 'qartod_tests' is True)
+    def _add_qartod_test(self, variable: str, test: str, parameters: Any):
+        """Add to dictionary of QARTOD tests to perform.
+
+        Note
+        ----
+        Internal; `qartod_tests` attribute fills in public methods
+
+        Parameters
+        ----------
+        variable : str
+            Variable name
+        test : str
+            Test name for variable
+        parameters : Any
+            Test parameters for variable
+
         """
         _log.debug(f'Adding {variable} to QARTOD test metadata')
         try:
             self.qartod_tests['streams'][variable]['qartod'][test] = parameters
-        except:
+        except Exception:
             try:
-                self.qartod_tests['streams'][variable] = {'qartod':
-                                                          {test: parameters}}
-            except:
-                self.qartod_tests = {'streams': {variable: {'qartod':
-                                                            {test: parameters}}}}
+                self.qartod_tests['streams'][variable] = {
+                    'qartod': {test: parameters}
+                }
+            except Exception:
+                self.qartod_tests = {'streams': {variable: {
+                    'qartod': {test: parameters}
+                }}}
         # #this part will only be necessary/useful if pyglider and
         # ioos_qc cooperate
         # try:
@@ -959,56 +1120,134 @@ class DeploymentYAML():
 
 
 class DeploymentNetCDF():
-    """
-    class with methods for making and reading NetCDFs in IOOS Glider DAC form
+    """Contains deployment-specific data and metadata in IOOS Glider DAC form
+
+    Parameters
+    ----------
+    main_directory : str
+        Path to directory with raw file directory and cache file
+        directory that will also hold the processed file directory
+    binary_directory : str, default = 'Raw'
+        Path, relative to main_directory, that holds raw files
+    cache_directory : str, default = join_path('Raw', 'Cache')
+        Path, relative to main_directory, that holds cache files
+    deployment_yaml : str, default = 'deployment_metadata.yml'
+        Path, relative to main_directory, for the YAML with the
+        deployment-specific metadata
+    style : str, default = 'Realtime'
+        Deployment processing type, either 'Realtime' or 'Delayed'
+
+    Attributes
+    ----------
+    main_directory : str
+        Full path to raw, cache, and processed directories
+    binary_directory : str
+        Full path to directory with raw files
+    cache_directory : str
+        Full path to directory with cache files
+    deployment_yaml : str
+        Full path to deployment-specific YAML file
+    style : str
+        Deployment processing type
+    l0timeseries_directory : str
+        Full path to the directory with the L0 timeseries NetCDFs
+    l0profile_directory : str
+        Full path to the directory with the L0 profile NetCDFs
+    l0timeseries_outname : str
+        Full path to the L0 timeseries NetCDF
+    l1timeseries_directory : str
+        Full path to the directory with the L1 timeseries NetCDFs
+    l1profile_directory : str
+        Full path to the directory with the L1 profile NetCDFs
+    l1timeseries_outname : str
+        Full path to the L1 timeseries NetCDF
+    passing_state : dict
+        Full path of each file checked and its passing state,
+        which is False if not passed or already evaluated
+
     """
 
-    def __init__(self, main_directory, binary_directory='Raw',
-                 cache_directory=join_path('Raw', 'Cache'),
-                 style='Realtime',
-                 deployment_yaml='deployment_metadata.yml'):
-        """
-        initialize class with directory and file pathnames
-        all are relative to main_directory
-        """
-        # assign inputs
+    def __init__(
+            self,
+            main_directory: str,
+            binary_directory: str = 'Raw',
+            cache_directory: str = join_path('Raw', 'Cache'),
+            deployment_yaml: str = 'deployment_metadata.yml',
+            style: str = 'Realtime'
+    ) -> None:
         self.main_directory = main_directory
         self.binary_directory = join_path(main_directory, binary_directory)
         self.cache_directory = join_path(main_directory, cache_directory)
-        self.style = style
         self.deployment_yaml = join_path(
             main_directory, style, deployment_yaml
         )
+        self.style = style
 
-    def read_timeseries(self, timeseries_file):
+    def read_timeseries(self, timeseries_file: str) -> xr.Dataset:
+        """Read a timeseries NetCDF as a Dataset
+
+        Parameters
+        ----------
+        timeseries_file : str
+            Path, relative to the class's main_directory and style,
+            to a timeseries NetCDF file
+
+        Returns
+        -------
+        xarray Dataset
+            Dataset from file
+
         """
-        read a timeseries NetCDF created by make_L0 or make_L1
-        filename is relative to main_directory and style
-        """
-        timeseries_file = join_path(self.main_directory, self.style,
-                                    timeseries_file)
+        timeseries_file = join_path(
+            self.main_directory, self.style, timeseries_file
+        )
         _log.info(f'Reading {timeseries_file} into memory')
         with xr.open_dataset(timeseries_file) as ds:
             return ds
 
-    def read_profiles(self, profile_directory):
+    def read_profiles(self, profile_directory: str) -> xr.Dataset:
+        """Read a directory of profile NetCDFs as a single Dataset
+
+        Parameters
+        ----------
+        profile_directory : str
+            Path, relative to the class's main_directory and style,
+            to a directory of profile NetCDF files
+
+        Returns
+        -------
+        xarray Dataset
+            Combined Dataset from files
+
         """
-        read a directory of profile NetCDFs as a single dataset
-        directory name is relative to main_directory and style
-        """
-        profile_directory = join_path(self.main_directory, self.style,
-                                      profile_directory, '*.nc')
+        profile_directory = join_path(
+            self.main_directory, self.style, profile_directory, '*.nc'
+        )
         _log.info(f'Reading all files in {profile_directory} into memory')
         with xr.open_mfdataset(profile_directory) as ds:
             return ds
 
-    def make_L0(self, l0timeseries_directory='L0-timeseries',
-                l0profile_directory='L0-profiles'):
-        """
-        create the L0 (read and interpolate according to PyGlider) timeseries
-        and profile NetCDFs directories are relative to class main_directory
-        and specified style
-        give l0profile_directory None or False to skip writing profile NetCDFs
+    def make_L0(
+            self,
+            l0timeseries_directory: str = 'L0-timeseries',
+            l0profile_directory: str | bool | None = 'L0-profiles'
+    ) -> None:
+        """Create L0 (read and interpolated) timeseries and profile NetCDFs.
+
+        Note
+        ----
+        Reading and interpolating occur according to `pyglider`
+
+        Parameters
+        ----------
+        l0timeseries_directory : str, optional
+            Path, relative to class's main_directory and style,
+            to the directory to put the L0 timeseries NetCDFs
+        l0profile_directory : str, optional
+            Path, relative to class's main_directory and style,
+            to the directory to put the L0 profile NetCDFs.
+            Specify None or False to skip writing profile NetCDFs
+
         """
         # assign inputs
         match self.style:
@@ -1023,13 +1262,13 @@ class DeploymentNetCDF():
             case _:
                 raise ValueError('Input "style" must be "realtime", ' +
                                  '"delayed", or None')
-        self.l0timeseries_directory = join_path(self.main_directory,
-                                                self.style,
-                                                l0timeseries_directory)
+        self.l0timeseries_directory = join_path(
+            self.main_directory, self.style, l0timeseries_directory
+        )
         if l0profile_directory:
-            self.l0profile_directory = join_path(self.main_directory,
-                                                 self.style,
-                                                 l0profile_directory)
+            self.l0profile_directory = join_path(
+                self.main_directory, self.style, l0profile_directory
+            )
         else:
             self.l0profile_directory = l0profile_directory
 
@@ -1039,7 +1278,8 @@ class DeploymentNetCDF():
             self.binary_directory, self.cache_directory,
             self.l0timeseries_directory, self.deployment_yaml,
             search=self.search, profile_filt_time=self.profile_filt_time,
-            profile_min_time=self.profile_min_time)
+            profile_min_time=self.profile_min_time
+        )
         _log.info('Created L0 single timeseries NetCDF' +
                   f' {self.l0timeseries_outname}')
 
@@ -1047,31 +1287,49 @@ class DeploymentNetCDF():
         if self.l0profile_directory:
             _log.info('Creating L0 profile NetCDFs in ' +
                       f'{self.l0profile_directory}')
-            extract_timeseries_profiles(self.l0timeseries_outname,
-                                        self.l0profile_directory,
-                                        self.deployment_yaml)
+            extract_timeseries_profiles(
+                self.l0timeseries_outname,
+                self.l0profile_directory,
+                self.deployment_yaml
+            )
 
-    def make_L1(self, l1timeseries_directory='L1-timeseries',
-                l1profile_directory='L1-profiles'):
-        """
-        create the L1 (QARTOD tested) timeseries and profile NetCDFs
-        directories are relative to class main_directory and style
-        give l1profile_directory None or False to skip writing profile NetCDFs
+    def make_L1(
+            self,
+            l1timeseries_directory: str = 'L1-timeseries',
+            l1profile_directory: str | bool | None = 'L1-profiles'
+    ) -> None:
+        """Create the L1 (QARTOD tested) timeseries and profile NetCDFs.
+
+        Note
+        ----
+        Tests performed according to `ioos_qc`
+
+        Parameters
+        ----------
+        l1timeseries_directory : str, optional
+            Path, relative to class's main_directory and style,
+            to the directory to put the L1 timeseries NetCDFs
+        l1profile_directory : str, optional
+            Path, relative to class's main_directory and style,
+            to the directory to put the L1 profile NetCDFs.
+            Specify None or False to skip writing profile NetCDFs
+
         """
         # make sure already have an L0
         if not hasattr(self, 'l0timeseries_outname'):
-            raise AttributeError('No L0 timeseries file exists. Must run ' +
-                                 'DeploymentNetCDF.L0 before ' +
-                                 'DeploymentNetCDF.L1')
+            raise AttributeError(
+                'No L0 timeseries file path exists. ' +
+                'Must run make_L0 before make_L1'
+            )
 
         # assign inputs
-        self.l1timeseries_directory = join_path(self.main_directory,
-                                                self.style,
-                                                l1timeseries_directory)
+        self.l1timeseries_directory = join_path(
+            self.main_directory, self.style, l1timeseries_directory
+        )
         if l1profile_directory:
-            self.l1profile_directory = join_path(self.main_directory,
-                                                 self.style,
-                                                 l1profile_directory)
+            self.l1profile_directory = join_path(
+                self.main_directory, self.style, l1profile_directory
+            )
         else:
             self.l1profile_directory = l1profile_directory
 
@@ -1087,30 +1345,24 @@ class DeploymentNetCDF():
         _log.info('Creating L1 single timeseries ' +
                   f'NetCDF {self.l1timeseries_outname}')
 
-        # get configuration
-        # output progress
+        # use yaml configuration for ioos_qc configuration
         _log.info('Extracting QARTOD test parameters from ' +
                   f'{self.deployment_yaml}')
-        # get metadata from yaml
         with open(self.deployment_yaml) as fin:
             metadata = yaml.safe_load(fin)
-        # use yaml configuration for ioos_qc configuration
         config = Config(metadata['qartod_tests'])
 
-        # #perform qartod tests on L0 timeseries netcdf file to create
-        # L1 timeseries
-        # output progress
+        # perform qartod tests on L0 to create L1
         _log.info(f'Running QARTOD tests on {self.l0timeseries_outname}')
-        # open dataset
         with xr.open_dataset(self.l0timeseries_outname) as ds:
             # run initial tests
             stream = XarrayStream(ds, time='time', z='depth',
                                   lat='latitude', lon='longitude')
             runner = list(stream.run(config))
             # group initial results by stream_id (source variable)
-            grouped_runner = ({k: list(g) for k, g in groupby(runner,
-                                                              lambda r:
-                                                              r.stream_id)})
+            grouped_runner = (
+                {k: list(g) for k, g in groupby(runner, lambda r: r.stream_id)}
+            )
             # run aggregate tests and add to initial results
             for source, run in grouped_runner.items():
                 result = collect_results(run)
@@ -1133,18 +1385,19 @@ class DeploymentNetCDF():
             # store results
             store = PandasStore(runner)
             # append results to existing Dataset
-            ds = xr.merge([ds,
-                           # store results as DataFrame
-                           store.save()
-                           # set the index (xarray coordinate) to time
-                           .set_index('time')
-                           # remove redundant columns added by ioos_qc
-                           .drop(columns=['z', 'lat', 'lon'])
-                           # make all bytes
-                           .astype('int8')
-                           # convert results to Dataset
-                           .to_xarray()
-                           ])
+            ds = xr.merge([
+                ds,
+                # store results as Pandas DataFrame
+                store.save()
+                # set the index (xarray coordinate) to time
+                .set_index('time')
+                # remove redundant columns added by ioos_qc
+                .drop(columns=['z', 'lat', 'lon'])
+                # make all bytes as required by GDAC
+                .astype('int8')
+                # convert results to Dataset
+                .to_xarray()
+            ])
         # redefine some aggregate results how GDAC wants
         for name, da in ds.data_vars.items():
             if '_qc' in name:
@@ -1153,7 +1406,6 @@ class DeploymentNetCDF():
         for result in store.collected_results:
             # get variable name of focus test result
             name = column_from_collected_result(result)
-            # update progress
             _log.debug(f'Adding {name} to dataset')
             # get test function of focus test result
             func = result.function
@@ -1167,10 +1419,12 @@ class DeploymentNetCDF():
             if '_qc' in name:
                 # define flags
                 flag_values = [x for x in range(0, 10)]
-                flag_names = ('no_qc_performed good_data probably_good_data' +
-                              'bad_data_that_are_potentially_correctable ' +
-                              'bad_data value_changed not_used not_used ' +
-                              'interpolated_value missing_value')
+                flag_names = (
+                    'no_qc_performed good_data probably_good_data' +
+                    'bad_data_that_are_potentially_correctable ' +
+                    'bad_data value_changed not_used not_used ' +
+                    'interpolated_value missing_value'
+                )
                 # define "input" for focus test result
                 call = 'various'
             else:
@@ -1199,30 +1453,27 @@ class DeploymentNetCDF():
                 ioos_qc_config=call,
                 _FillValue=np.byte(-127)
             )
-        # #export L1 timeseries netcdf file
-        # output progress
+        # export L1 timeseries netcdf file
         _log.info(f'Saving QARTOD test results as {self.l1timeseries_outname}')
-        # output new L1 NetCDF
         ds.to_netcdf(self.l1timeseries_outname)
 
-        # #make L1 profile NetCDF files for IOOS GliderDAC
+        # make L1 profile NetCDF files for IOOS GliderDAC
         if self.l1profile_directory:
-            # output progress
             _log.info('Creating L1 profile NetCDFs in' +
                       f' {self.l1profile_directory}')
-            # write
             extract_timeseries_profiles(self.l1timeseries_outname,
                                         self.l1profile_directory,
                                         self.deployment_yaml)
 
-    def check_compliance(self, profile_directory='L1-profiles'):
-        """
-        use the IOOS compliance checker on profile files produced in L0 or L1
-        (defaults to L1)
-        filenames are relative to class main_directory and style
-        only do ones that haven't been checked
-        outputs name of each file checked and passing state
-        (False if not passed or already evaluated)
+    def check_compliance(self, profile_directory: str = 'L1-profiles') -> None:
+        """Use the IOOS compliance checker on profile files.
+
+        Parameters
+        ----------
+        profile_directory : str, optional
+            Path, relative to class's main_directory and style,
+            to the directory with the target profile NetCDFs
+
         """
         profile_directory = join_path(self.main_directory, self.style,
                                       profile_directory)
@@ -1252,14 +1503,10 @@ class DeploymentNetCDF():
         # run compliance checker for each file
         passed = [False] * len(file_names)
         for idx, file in enumerate(file_names):
-            # make true file name
             file = file.split('.')[0]
             file = join_path(profile_directory, file)
-            # output progress
             _log.info(f'Checking {file}_report.txt')
-            # if report doesn't already exist
             if not exists(file+'_report.txt'):
-                # check
                 passed[idx], _ = checker.run_checker(
                     ds_loc=file+'.nc',
                     output_filename=file+'_report.txt',
@@ -1267,7 +1514,6 @@ class DeploymentNetCDF():
                     verbose=log_level,
                     criteria='normal'
                 )
-                # output
                 if passed[idx]:
                     isnot = 'is'
                 else:
@@ -1276,32 +1522,66 @@ class DeploymentNetCDF():
                           f'See {file}_report.txt for details.')
 
         # output
-        self.passing_state = {join_path(profile_directory, file):
-                              state for file, state in zip(file_names, passed)}
+        self.passing_state = {
+            join_path(profile_directory, file):
+            state for file, state in zip(file_names, passed)
+        }
 
-    def create_summary(self, timeseries_file='L0', output_file='L0',
-                       display=False,
-                       author='Anonymous', extra_text='',
-                       map_bounds=None, globe_position='BL',
-                       plots=({'source': 'temperature', 'cmap':
-                               'cmocean.sequential.Thermal_20'},
-                              {'source': 'salinity', 'cmap':
-                               'cmocean.sequential.Haline_20'},
-                              {'source': 'density', 'cmap':
-                               'cmocean.sequential.Dense_20'})):
-        """
-        output a summary page from a timeseries NetCDF file
-        filenames are relative to main_directory and style
-        timeseries can be abbreviated with 'L0' or 'L1' to refer to
-        files created in previous steps or defined explicitly
-        define output_file=False to skip file creation (requires display=True)
-        display will render the summary in default viewer or notebook
-        extra_text adds text on the same line as funding acknowledgement
-        map_bounds in [minimum latitude, maximum latitude, minimum longitude,
-        maximum longitude] form
-        map_bounds=None will define based on data
-        specify 3 subplots, in order of top to bottom, with palettable
-        colortables
+    def create_summary(
+            self,
+            timeseries_file: str = 'L0',
+            output_file: str = 'L0',
+            display: bool = False,
+            author: str = 'Anonymous',
+            extra_text: str = '',
+            map_bounds: list[float] = None,
+            globe_position: str = 'BL',
+            plots: tuple[dict[str, str]] = (
+                {'source': 'temperature',
+                 'cmap': 'cmocean.sequential.Thermal_20'},
+                {'source': 'salinity',
+                 'cmap': 'cmocean.sequential.Haline_20'},
+                {'source': 'density',
+                 'cmap': 'cmocean.sequential.Dense_20'}
+            )
+    ):
+        """Output a summary page from a timeseries NetCDF file.
+
+        Parameters
+        ----------
+        timeseries_file : str, optional
+            Path, relative to class's main_directory and style,
+            to target timeseries NetCDF file.
+            May use shortcuts 'L0' and 'L1' to refer to files
+            created with class methods.
+        output_file : str, optional
+            Path, relative to class's main_directory and style,
+            for output PNG file.
+            May use shortcuts 'L0' and 'L1' to refer to files
+            created with class methods.
+            If False, will not write a file.
+        display : bool, optional
+            Whether to display the summary in default viewer
+        author : str, optional
+            Name of the person creating the summary page
+        extra_text : str, optional
+            Any text to add on the same line as funding acknowledgement
+            (ie glider faults)
+        map_bounds : list or None, optional
+            Map bounds in form
+            [minimum latitude, maximum latitude,
+            minimum longitude, maximum longitude].
+            Specify None to define based on data
+        globe_position : str, optional
+            Position on map for overview globe. Use codes in terms of
+            (T)op, (M)iddle, (B)ottom and
+            (L)eft, (C)enter, (R)ight
+        plots : tuple[dict[str, str]], optional
+            Three subplots, in order of top to bottom,
+            with palettable colortables in form
+            {'source': 'variable_name',
+            'cmap': 'path.to.colortable'}
+
         """
         # re-define inputs
         match timeseries_file:
@@ -1310,7 +1590,7 @@ class DeploymentNetCDF():
                     raise AttributeError(
                         'DeploymentNetCDF class does not have attribute ' +
                         '"l0timeseries_outname". Must run ' +
-                        'DeploymentNetCDF.make_l0 to use ' +
+                        'make_l0 method to use ' +
                         'timeseries_file input "L0".'
                     )
                 timeseries_file = self.l0timeseries_outname
@@ -1319,7 +1599,7 @@ class DeploymentNetCDF():
                     raise AttributeError(
                         'DeploymentNetCDF class does not have attribute ' +
                         '"l1timeseries_outname". Must run ' +
-                        'DeploymentNetCDF.make_l1 to use ' +
+                        'make_l1 method to use ' +
                         'timeseries_file input "L1".'
                     )
                 timeseries_file = self.l1timeseries_outname
@@ -1334,7 +1614,7 @@ class DeploymentNetCDF():
                     raise AttributeError(
                         'DeploymentNetCDF class does not have attribute ' +
                         '"l0timeseries_outname". Must run ' +
-                        'DeploymentNetCDF.make_l0 to use ' +
+                        'make_l0 method to use ' +
                         'output_file input "L0".'
                     )
                 output_file = join_path(
@@ -1346,7 +1626,7 @@ class DeploymentNetCDF():
                     raise AttributeError(
                         'DeploymentNetCDF class does not have attribute ' +
                         '"l1timeseries_outname". Must run ' +
-                        'DeploymentNetCDF.make_l1 to use ' +
+                        'make_l1 method to use ' +
                         'output_file input "L1".'
                     )
                 output_file = join_path(
@@ -1363,12 +1643,11 @@ class DeploymentNetCDF():
 
         _log.info('Creating summary page')
 
-        # get metadata from deployment YAML
+        # get data and metadata
+        data = self.read_timeseries(timeseries_file)
         with open(self.deployment_yaml) as fin:
             metadata = yaml.safe_load(fin)
             metadata = metadata['metadata']
-        # get data from timeseries NetCDF
-        data = self.read_timeseries(timeseries_file)
 
         # create additional header info
         title = ('Ocean Glider Deployment Summary: ' +
@@ -1443,7 +1722,7 @@ class DeploymentNetCDF():
                         ]
         )
 
-        # #define map limits
+        # define map limits
         if map_bounds is not None:
             min_lat = map_bounds[0]
             max_lat = map_bounds[1]
@@ -1459,11 +1738,10 @@ class DeploymentNetCDF():
             max_lon = np.ceil((np.nanmax(data['longitude'].values) + 1)
                               * 10) / 10
 
-        # #create summary page
-        # initialize
+        # initialize summary page
         fig = pygmt.Figure()
-        # define gmt processing debug output level based on user's selected
-        # log level
+        # define gmt processing debug output level based on
+        # user's selected log level
         match _log.root.level:
             # DEBUG
             case 10:
@@ -1482,8 +1760,10 @@ class DeploymentNetCDF():
         # define map common paramters
         avg_lat = np.mean([min_lat, max_lat])
         avg_lon = np.mean([min_lon, max_lon])
-        z_levels = ','.join([str(num) for num in [*range(0, 901, 100)] +
-                             [*range(1000, 6001, 1000)]])
+        z_levels = ','.join(
+            [str(num) for num in [*range(0, 901, 100)] +
+             [*range(1000, 6001, 1000)]]
+        )
         zone = from_latlon(avg_lat, avg_lon)
         zone = f'{zone[2]}{zone[3]}'
         # define Hovmoller diagram common parameters
@@ -1518,10 +1798,12 @@ class DeploymentNetCDF():
             lbl = (f'{data[var['source']].attrs['long_name']} ' +
                    f'({data[var['source']].attrs['units']})')
             _log.info(f'Adding {lbl} plot to summary page')
-            pygmt.makecpt(cmap=temporary_cpt(palette=var['cmap']),
-                          background='o',
-                          series=[np.nanmean(z)-3*np.nanstd(z),
-                                  np.nanmean(z)+3*np.nanstd(z)])
+            pygmt.makecpt(
+                cmap=temporary_cpt(palette=var['cmap']),
+                background='o',
+                series=[np.nanmean(z)-3*np.nanstd(z),
+                        np.nanmean(z)+3*np.nanstd(z)]
+            )
             fig.shift_origin(yshift=f'f{dy}')
             with pygmt.config(FONT_ANNOT_PRIMARY=6):
                 fig.basemap(region=region, projection=projection,
@@ -1540,7 +1822,8 @@ class DeploymentNetCDF():
         _log.info('Adding map to summary page')
         grid = pygmt.datasets.load_earth_relief(
             region=[min_lon-1, max_lon+1, min_lat-1, max_lat+1],
-            resolution='15s', data_source='gebcosi') * -1
+            resolution='15s', data_source='gebcosi'
+        ) * -1
         fig.shift_origin(xshift='f0.5', yshift='f17.25')
         pygmt.makecpt(cmap=temporary_cpt(
             palette='colorbrewer.sequential.Blues_9'), background='o',
@@ -1551,9 +1834,11 @@ class DeploymentNetCDF():
             grid=grid, cmap=True
         )
         fig.coast(land='white', shorelines=True)
-        pygmt.makecpt(cmap=temporary_cpt(
-            palette='cmocean.sequential.Amp_20'), background='o',
-            series=[min_time, max_time])
+        pygmt.makecpt(
+            cmap=temporary_cpt(palette='cmocean.sequential.Amp_20'),
+            background='o',
+            series=[min_time, max_time]
+        )
         fig.plot(
             x=data['longitude'].values,
             y=data['latitude'].values,
@@ -1562,12 +1847,15 @@ class DeploymentNetCDF():
         )
         fig.basemap(frame='lrbt')
         # inset map
-        grid = pygmt.datasets.load_earth_relief(resolution='10m',
-                                                data_source='gebcosi') * -1
+        grid = pygmt.datasets.load_earth_relief(
+            resolution='10m', data_source='gebcosi'
+        ) * -1
         with fig.inset(position=f'j{globe_position}+w2.75+o0.25'):
-            pygmt.makecpt(cmap=temporary_cpt(
-                palette='colorbrewer.sequential.Blues_9'), background='o',
-                series=z_levels)
+            pygmt.makecpt(
+                cmap=temporary_cpt(palette='colorbrewer.sequential.Blues_9'),
+                background='o',
+                series=z_levels
+            )
             fig.grdimage(
                 region='g', projection=f'G{avg_lon}/{avg_lat}/10/?',
                 frame='g10', grid=grid, cmap=True
@@ -1582,15 +1870,21 @@ class DeploymentNetCDF():
         _log.info('Adding metadata snapshot to summary page')
         _log.debug(f'Using text\n{snapshot}')
         fig.shift_origin(xshift='f13.75', yshift='f17.25')
-        fig.basemap(region=[0, 1, 0, len(snapshot[0])+1],
-                    projection='X7/-10.5', frame='lbtr+ggray95')
+        fig.basemap(
+            region=[0, 1, 0, len(snapshot[0])+1],
+            projection='X7/-10.5', frame='lbtr+ggray95'
+        )
         for col, text in enumerate(snapshot):
-            fig.text(x=np.ones(len(text))*0.375*col, y=range(1, len(text)+1),
-                     text=text, justify='LM', offset='0.25/0', font=7)
+            fig.text(
+                x=np.ones(len(text))*0.375*col, y=range(1, len(text)+1),
+                text=text, justify='LM', offset='0.25/0', font=7
+            )
         # main map colorbar ("attached" to metadata text box for easier
         # position and sizing)
-        pygmt.makecpt(cmap=temporary_cpt(palette='cmocean.sequential.Amp_20'),
-                      background='o', series=[min_time, max_time])
+        pygmt.makecpt(
+            cmap=temporary_cpt(palette='cmocean.sequential.Amp_20'),
+            background='o', series=[min_time, max_time]
+        )
         fig.colorbar(cmap=True, frame='af', position='jBL+w10.5+o-0.6/0+ma')
         # title, author, date, extra text
         _log.info('Adding header information to summary page')
@@ -1601,20 +1895,23 @@ class DeploymentNetCDF():
             f'\ttext {extra_text}'
         _log.debug(debug_text)
         fig.shift_origin(xshift='f0', yshift='f28')
-        # fig.basemap(region=[-1,1,-1.5,1.5],projection='X21/1.75',frame='b')
         fig.text(
-            region=[-1, 1, -1.5, 1.5], projection='X21/1.75',
+            region=[-1, 1, -1.5, 1.5],
+            projection='X21/1.75',
             x=0, y=0.5,
-            text=title, font=12, justify='BC')
+            text=title, font=12, justify='BC'
+        )
         fig.text(
             x=0, y=0,
-            text=(f'Deployed from {(data['time'].values[0]
-                                   .astype('datetime64[s]').item()
-                                   .strftime('%d %B, %Y'))} ' +
-                  (f'to {(data['time'].values[-1]
-                          .astype('datetime64[s]').item()
-                          .strftime('%d %B, %Y'))} *** Prepared by {author}' +
-                   f' on {date}')),
+            text=(
+                f'Deployed from {(data['time'].values[0]
+                                  .astype('datetime64[s]').item()
+                                  .strftime('%d %B, %Y'))} ' +
+                (f'to {(data['time'].values[-1]
+                        .astype('datetime64[s]').item()
+                        .strftime('%d %B, %Y'))} ' +
+                 f'*** Prepared by {author} on {date}')
+            ),
             justify='MC'
         )
         with NamedTemporaryFile(mode='w', suffix='.txt',
@@ -1622,6 +1919,7 @@ class DeploymentNetCDF():
             f.write(f'> 0 -0.5 8p 18 c\n{extra_text}')
             f.close()
             fig.text(textfiles=f.name, font=8, justify='TC', M=True)
+
         # save
         if output_file:
             _log.info(f'Saving summary page as {output_file}')

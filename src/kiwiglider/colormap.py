@@ -1,3 +1,6 @@
+# Source:
+# https://github.com/mjziebarth/gmt-python-extensions/blob/master/gmt_extensions/colormap.py
+
 # Provides colormap classes.
 from abc import ABCMeta  # , abstractmethod
 from tempfile import NamedTemporaryFile
@@ -48,7 +51,7 @@ class Colormap(metaclass=ABCMeta):
         for i in range(self.cpt_table.shape[0]-1):
             x0 = vmin + dv*self.cpt_table[i, 0]
             x1 = vmin + dv*self.cpt_table[i+1, 0]
-            self._cpt.write("%.5f\t%i/%i/%i\t%.5f\t%i/%i/%i\n" % 
+            self._cpt.write("%.5f\t%i/%i/%i\t%.5f\t%i/%i/%i\n" %
                             (x0, 255*self.cpt_table[i, 1],
                              255*self.cpt_table[i, 2],
                              255*self.cpt_table[i, 3],
