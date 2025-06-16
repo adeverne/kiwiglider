@@ -1,10 +1,57 @@
-"""
-Utilities for processing Slocum glider files the Kiwi way
-"""
-from importlib import import_module  # used to import from palettable
+"""Utilities for processing Slocum glider files the Kiwi way"""
+import logging
 import numpy as np
-from distinctipy import get_colors, get_colormap
-from kiwiglider.colormap import MPLWrapperColormap
+from openpyxl import load_workbook
+
+
+_log = logging.getLogger(__name__)
+
+
+def collect_excelsheet_metadata(
+        excelsheet: str, ID: int = 1
+) -> dict[str, list[str | int | float]]:
+    """Extract Excel sheet metadata for given deployment ID.
+
+    Note
+    ----
+    First row of Excel sheet must contain descriptive column headers.
+    First column of Excel sheet must contain deployment ID numbers.
+
+    Parameters
+    ----------
+    excelsheet : str
+        Path to Excel sheet with metadata
+    ID : int
+        Deployment number/ID to focus on
+
+    Returns
+    -------
+    dict[str, list[str | int | float]]
+        Excel sheet metadata from specified deployment
+
+    """
+    _log.info(f'Getting metadata from {excelsheet}')
+
+    # load the Excel sheet
+    worksheet = load_workbook(excelsheet).active
+    # get header names (must be present in first row)
+    headers = [
+        worksheet.cell(row=1, column=idx).value
+        for idx in range(2, worksheet.max_column+1)
+    ]
+    # get deployment numbers (must be present in first column)
+    deployments = [
+        worksheet.cell(row=idx, column=1).value
+        for idx in range(2, worksheet.max_row+1)
+    ]
+
+    # return metadata from input deployment ID
+    return {
+        headers[idx-2]: worksheet.cell(
+            row=deployments.index(ID)+2, column=idx
+        ).value
+        for idx in range(2, worksheet.max_column+1)
+    }
 
 
 def dd2dm(decimal_degrees: float) -> tuple[float, float]:
@@ -56,71 +103,6 @@ def dm2dd(degrees: float, minutes: float) -> float:
     decimal_degrees = np.where(degrees < 0 or minutes < 0, decimal_degrees*-1,
                                decimal_degrees)
     return decimal_degrees
-
-
-def temporary_cpt(
-        palette: str = None,
-        num_colors: int = None,
-        seed: int = 1,
-        background: list[float] | str = None
-) -> MPLWrapperColormap:
-    """Create a temporary .cpt for use with PyGMT.
-
-    Note
-    ----
-    Must specify either
-        palette
-            or
-        num_colors (with optional seed and background)
-
-    Parameters
-    ---------
-    palette : str or None, optional
-        Path for palettable class
-        (ex colorbrewer.sequential.Blues_9)
-    num_colors : int or None, optional
-        Number of distinguishable colors in palette
-    seed : int, optional
-        Random seed
-    background : list[float] | str, optional
-        list of RGB (in 0-1) or palattable class path
-        to exclude from distinct colors
-
-    Returns
-    -------
-    MPLWrapperColormap
-        Color palette to use as cmap in PyGMT
-
-    """
-    if palette:
-        if type(palette) is not str:
-            raise TypeError('Input "palette" must be a string')
-
-        palette = palette.split('.')
-        cpt = getattr(import_module('.'.join(['palettable']+palette[:-1])),
-                      palette[-1]).mpl_colormap
-    elif num_colors:
-        if type(num_colors) is not int:
-            raise TypeError('Input "num_colors" must be an integer')
-        if type(seed) is not int:
-            raise TypeError('Input "seed" must be an integer')
-        if type(background) is str:
-            background = background.split('.')
-            background = getattr(import_module(
-                '.'.join(['palettable'] + background[:-1])),
-                background[-1]).mpl_colors
-        elif type(background) is list or background is None:
-            pass
-        else:
-            raise TypeError('Input "background" must be a list or string')
-
-        cpt = get_colormap(
-            get_colors(num_colors, rng=seed, exclude_colors=background)
-        )
-    else:
-        raise ValueError('Must input either "palette" or "num_colors"')
-
-    return MPLWrapperColormap(cpt)
 
 
 def first_nonnan(numpy_array: np.array) -> float:
