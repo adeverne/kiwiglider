@@ -1,25 +1,28 @@
 
----
 # title: 'KiwiGlider: A Python package for post-processing Slocum Glider Data'
 
-## tags:
-  - Python
-  - oceanography
-  - gliders
-  - autonomous science
+## tags
 
-## authors:
-  - name: Alain de Verneil
+- Python
+- oceanography
+- gliders
+- autonomous science
+
+## authors
+
+- name: Alain de Verneil
     orcid: 0000-0002-8344-7953
     equal-contrib: true
     affiliation: 1 <!-- # (Multiple affiliations must be quoted) -->
     corresponding: true
-  - name: Cassandra Elmer
+- name: Cassandra Elmer
     orcid: 0009-0006-3619-3571
     equal-contrib: true <!-- > (This is how you can denote equal contributions between multiple authors) -->
     affiliation: 1
+
 affiliations:
- - name: National Institute of Water and Atmospheric research (NIWA), New Zealand
+
+- name: National Institute of Water and Atmospheric research (NIWA), New Zealand
    index: 1
 
 date: 30 May 2025
@@ -57,7 +60,7 @@ to provide an end-to-end solution, from reading raw data in near real time
 during deployment in the field up through the delayed post-processing of an
 entire dataset in preparation for scientific publication.
 
-# Capabilities
+## Capabilities
 
 At its heart, `KiwiGlider` is meant to add certain post-processing to Slocum
 glider data that does not currently exist in Python. However, post-processing
@@ -66,10 +69,11 @@ have ported this functionality to the Python code to `KiwiGlider`.
 
 For example, using Matlab code from the GEOMAR glider toolbox, we have adapted
 routines to:
-  - Run quality control on glider telemetry (e.g. GPS longitude/latitude).
-  - Calculate best temperature lag for salinity calculations, following
+
+- Run quality control on glider telemetry (e.g. GPS longitude/latitude).
+- Calculate best temperature lag for salinity calculations, following
     [Garau et al. 2011](https://doi.org/10.1175/JTECH-D-10-05030.1).
-  - Calculate optode delays in oxygen sensors.
+- Calculate optode delays in oxygen sensors.
 
 In addition to the usual post-processing, we also make use of existing packages
 necessary for extended applications. One example of this is the use of the
@@ -77,7 +81,7 @@ necessary for extended applications. One example of this is the use of the
 glider to produce accurate flow speeds for microstructure turbulence
 measurements.
 
-# Citations
+## Citations
 
 Citations to entries in paper.bib should be in
 [rMarkdown](http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html)
@@ -87,11 +91,12 @@ If you want to cite a software repository URL (e.g. something on GitHub without 
 citation) then you can do it with the example BibTeX entry below for @fidgit.
 
 For a quick reference, the following citation commands can be used:
+
 - `@author:2001`  ->  "Author et al. (2001)"
 - `[@author:2001]` -> "(Author et al., 2001)"
 - `[@author1:2001; @author2:2001]` -> "(Author1 et al., 2001; Author2 et al., 2002)"
 
-# Figures
+## Figures
 
 Figures can be included like this:
 ![Caption for example figure.\label{fig:example}](figure.png)
@@ -100,10 +105,10 @@ and referenced from text using \autoref{fig:example}.
 Figure sizes can be customized by adding an optional second parameter:
 ![Caption for example figure.](figure.png){ width=20% }
 
-# Acknowledgements
+## Acknowledgements
 
 We acknowledge support from the New Zealand MBIE Strategic Scientific Investment
 Fund (SSIF), and the contributions from J. O'Callaghan, J. McInerney,
 C. Stevens, and C. Collins.
 
-# References
+## References

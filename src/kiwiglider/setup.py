@@ -1,270 +1,218 @@
-#!/usr/bin/python3
-# setup.py in kiwiglider package
-# Here we contain the function to generate the processing environment for
-# KiwiGlider.
-# We follow this up with either reading in the YAML file for the deployment,
-# or autogenerating one from the metadata.
+""""
+Module containing functions for generating the processing environment for
+kiwiglider package. We follow this up with either reading in the YAML file
+for the deployment, or autogenerating one from metadata.
+"""
 
-def setup(rootDir: str, outDir: str = None, startDate: float = None,
-          endDate: float = None, verbose: bool = True) -> None:
-    """
+# Import necessary packages
+import os
+from glob import glob
+import shutil
+import sys
+from datetime import datetime, UTC
+import logging
+from pyglider import slocum
+
+_log = logging.getLogger(__name__)
+
+
+def setup(rootdir: str, outdir: str = None, startdate: float = None,
+          enddate: float = None) -> None:
+    """ Master function that creates processing directory with copied and
+        renamed raw data files and cache files.
+
     setup(rootDir: str, outDir: str = None, startDate: float = None,
           endDate: float = None, verbose: bool = True) -> None
+
     Parameters
     -----------
         rootDir : string
             Directory with raw EBD/DBD/SBD/TBD/CAC files for processing.
         outDir  : string
-            Directory to which the subdirectory "Raw" will be created and
+            Directory to which the subdirectory "Kiwi/Raw" will be created and
             copies of raw data and cache files to be sent.
         startDate : float, default = None
-        startDate (float) = None  POSIX timestamp (i.e. seconds since
-            1970-01-01Z00:00:00) indicating start of deployment.
-        endDate (float) = None POSIX timestamp (i.e. seconds since
-            1970-01-01Z00:00:00) indicating end of glider deployment.
-        verbose (bool)
+            POSIX timestamp (i.e. seconds since 1970-01-01Z00:00:00) indicating
+            start of deployment.
+        endDate : float, default = None
+            POSIX timestamp (i.e. seconds since 1970-01-01Z00:00:00) indicating
+            end of glider deployment.
     """
-    # Import needed packages
-    import os
-    from glob import glob
-    import shutil
-    import sys
-    from datetime import datetime, UTC
-    from pyglider import slocum
-
-    if verbose:
-        print("Initiated setup of Kiwiglider at " +
+    _log.info("Initiated setup of Kiwiglider at %s",
               datetime.strftime(datetime.now(tz=UTC),
-                                "%Y-%m-%d %H:%M:%S"))
+                                "%Y-5m-%d %H:%M:%S"))
 
-    # Test to see if rootDir exists and is not just "."
-    if os.path.exists(rootDir) & (rootDir != "."):
-        print(f"Path {rootDir} passes initial test...")
+    # INITIAL CHECKS
+    # Check to see if provided rootdir argument exists and not "."
+    if os.path.exists(rootdir) & (rootdir != "."):
+        _log.info("Path {rootdir} passes initial test...")
     else:
         raise ValueError("This path either does not exist, or it is '.'," +
                          " which cannot be used. Please write full path.")
-    # Default value of outDir is rootDir
-    if not outDir:
-        outDir = rootDir
 
-    # Check to see if Raw directory already exists
-    if os.path.exists(os.path.join(outDir, "Raw")):
-        if verbose:
-            print("Raw directory already exists...")
-        if os.path.exists(os.path.join(outDir, "Raw", "Cache")):
-            if verbose:
-                print("Raw AND Cache directories exist.")
-        else:
-            if verbose:
-                print("Creating Cache directory")
-            os.makedirs(os.path.join(outDir, "Raw", "Cache"))
+    # Make outdir rootdir by default
+    if not outdir:
+        outdir = rootdir
+
+    kiwidir = os.path.join(outdir, "Kiwi")
+    rawdir = os.path.join(kiwidir, "Raw")
+    cachedir = os.path.join(rawdir, "Cache")
+
+    # Check to see if Kiwi directory exists, if not create it.
+    if os.path.exists(kiwidir):
+        _log.info("Kiwi directory already exists.")
     else:
-        if verbose:
-            print("Making Raw directory for dbd/ebd and cache files.")
-        os.makedirs(os.path.join(outDir, "Raw"))
-        os.makedirs(os.path.join(outDir, "Raw", "Cache"))
+        _log.info("Creating Kiwi directory in rootdir")
+        print("Creating directory for kiwiglider at: ")
+        print(f"{kiwidir}")
+        os.makedirs(kiwidir)
 
+    # Check to see if Raw directory already exists, if not create it.
+    if os.path.exists(rawdir):
+        _log.info("Raw directory already exists.")
+        if os.path.exists(cachedir):
+            _log.info("Raw AND Cache directories exist.")
+        else:
+            _log.info("Creating Cache directory.")
+            print("Creating cache directory at: ")
+            print(f"{cachedir}")
+            os.makedirs(cachedir)
+    else:
+        _log.info("Making Raw directory for *bd and cache files.")
+        print("Creating Raw directory at:")
+        print(f"{rawdir}")
+        os.makedirs(rawdir)
+        print("Creating cache dir at: ")
+        print(f"{cachedir}")
+        os.makedirs(cachedir)
+
+    # SEARCH FOR RAW DATA AND CACHE FILES
     # Walk through rootDir, search for where EBD, DBD, CAC files are stored...
-    dbdDirs = []
-    nDBD = 0
-    ebdDirs = []
-    nEBD = 0
-    sbdDirs = []
-    nSBD = 0
-    tbdDirs = []
-    nTBD = 0
-    cacDirs = []
-    nCAC = 0
-    if verbose:
-        print(f"About to start navigating through {rootDir} ...")
-    for root, _, files in os.walk(rootDir):
-        # Skip the Raw directory...
-        if ((root != os.path.join(rootDir, "Raw")) &
-           (root != os.path.join(rootDir, "Raw", "Cache"))):
-            for filename in files:
-                # Check to see if ebd...
-                if os.path.splitext(filename)[1] in [".EBD", ".ebd"]:
-                    nEBD += 1
-                    if root not in ebdDirs:
-                        ebdDirs.append(root)
-                # Check to see if dbd...
-                if os.path.splitext(filename)[1] in [".DBD", ".dbd"]:
-                    nDBD += 1
-                    if root not in dbdDirs:
-                        dbdDirs.append(root)
-                # Check for sbd...
-                if os.path.splitext(filename)[1] in [".SBD", ".sbd"]:
-                    nSBD += 1
-                    if root not in sbdDirs:
-                        sbdDirs.append(root)
-                # Check for tbd...
-                if os.path.splitext(filename)[1] in [".TBD", ".tbd"]:
-                    nTBD += 1
-                    if root not in tbdDirs:
-                        tbdDirs.append(root)
-                # Check for CAC cache files...
-                if os.path.splitext(filename)[1] in [".CAC", ".cac"]:
-                    nCAC += 1
-                    if root not in cacDirs:
-                        cacDirs.append(root)
-    if verbose:
-        print(f"Done navigating {rootDir}")
-        print(f"Found {len(ebdDirs):02d} directories with a " +
-              f"total of {nEBD} ebd files ...")
-        [print(f"{x}") for x in ebdDirs]
-        print(f"Found {len(dbdDirs):02d} directories with a " +
-              f"total of {nDBD} dbd files ...")
-        [print(f"{x}") for x in dbdDirs]
-        print(f"Found {len(sbdDirs):02d} directories with a " +
-              f"total of {nSBD} sbd files ...")
-        [print(f"{x}") for x in sbdDirs]
-        print(f"Found {len(tbdDirs):02d} directories with a " +
-              f"total of {nTBD} tbd files ...")
-        [print(f"{x}") for x in tbdDirs]
-        print(f"Found {len(cacDirs):02d} directories with a " +
-              f"total of {nCAC} cac files:")
-        [print(f"{x}") for x in cacDirs]
+    _log.info("About to navigate through rootdir.")
+    _, dbddirs = _get_dirs(rootdir, ext="DBD")
+    _, ebddirs = _get_dirs(rootdir, ext="EBD")
+    _, sbddirs = _get_dirs(rootdir, ext="SBD")
+    _, tbddirs = _get_dirs(rootdir, ext="TBD")
+    n_cac, cacdirs = _get_dirs(rootdir, ext="CAC")
 
-    # For simplicity, but also because dbdreader uses glob to list all the
-    # DBD/EBD/SBD/TBD files, re-locate all DBD/EBD files to single "raw"
-    # directory with CAC files in sub-directory Cache/. Read metadata and
-    # re-name the files.
-    # Check to see if copies already exist....
-    e1 = glob(os.path.join(outDir, "Raw", "*.EBD"))
-    e1name = [x.split('/')[-1] for x in e1]
-    e2 = glob(os.path.join(outDir, "Raw", "*.ebd"))
-    e2name = [x.split('/')[-1] for x in e2]
+    # COPY ALL CACHE FILES to outdir/Kiwi/Raw/Cache/
+    # get pre-existing list of cache files in cacdir, copy new ones.
+    cnames = []
+    [cnames.append(x) for x in
+        set.union(set([x.split('/')[-1] for x in
+                       glob(os.path.join(cachedir, "*.CAC"))]),
+                  set([x.split('/')[-1] for x in
+                       glob(os.path.join(cachedir, "*.cac"))]))]
+    n_cac_exist = len(cnames)
 
-    if len(e1) + len(e2) != nEBD:
-        if verbose:
-            print(f"Found {len(e1) + len(e2)} ebd files in Raw, but " +
-                  f"detected {nEBD} files in total... will copy new files.")
-        for edir in ebdDirs:
-            for root, _, files in os.walk(edir):
-                for filename in files:
-                    if os.path.splitext(filename)[1] in [".EBD", ".ebd"]:
-                        if (filename not in e1name) & (filename not in e2name):
-                            shutil.copyfile(os.path.join(root, filename),
-                                            os.path.join(outDir, "Raw",
-                                                         filename))
-    d1 = glob(os.path.join(outDir, "Raw", "*.DBD"))
-    d1name = [x.split('/')[-1] for x in d1]
-    d2 = glob(os.path.join(outDir, "Raw", "*.dbd"))
-    d2name = [x.split('/')[-1] for x in d2]
+    if ~(n_cac_exist == n_cac):
+        for cacd in cacdirs:
+            cfiles = []
+            [cfiles.append(x) for x in
+                set.union(set([x.split('/')[-1] for x in
+                               glob(os.path.join(cacd, "*.CAC"))]),
+                          set([x.split('/')[-1] for x in
+                               glob(os.path.join(cacd, "*.cac"))]))]
+            for cf in cfiles:
+                if cf not in cnames:
+                    _log.info(f"Copying cache file {cf}")
+                    shutil.copyfile(os.path.join(cacd, cf),
+                                    os.path.join(cachedir, cf))
+    else:
+        _log.info("Cache files already copied (or right number of files, " +
+                  " at least)")
 
-    if len(d1)+len(d2) != nDBD:
-        if verbose:
-            print(f"Found {len(d1) + len(d2)} dbd files in Raw, but " +
-                  f"detected {nDBD} files in total... will copy new files.")
-        for ddir in dbdDirs:
-            for root, _, files in os.walk(ddir):
-                for filename in files:
-                    if os.path.splitext(filename)[1] in [".DBD", ".dbd"]:
-                        if (filename not in d1name) & (filename not in d2name):
-                            shutil.copyfile(os.path.join(root, filename),
-                                            os.path.join(outDir, "Raw",
-                                                         filename))
-    s1 = glob(os.path.join(outDir, "Raw", "*.SBD"))
-    s1name = [x.split('/')[-1] for x in s1]
-    s2 = glob(os.path.join(outDir, "Raw", "*.sbd"))
-    s2name = [x.split('/')[-1] for x in s2]
-    if len(s1) + len(s2) != nSBD:
-        if verbose:
-            print(f"Found {len(s1) + len(s2)} sbd files in Raw, but " +
-                  f"detected {nSBD} files in total... will copy new files.")
-        for sdir in sbdDirs:
-            for root, _, files in os.walk(sdir):
-                for filename in files:
-                    if os.path.splitext(filename)[1] in [".SBD", ".sbd"]:
-                        if (filename not in s1name) & (filename not in s2name):
-                            shutil.copyfile(os.path.join(root, filename),
-                                            os.path.join(outDir, "Raw",
-                                                         filename))
-
-    t1 = glob(os.path.join(outDir, "Raw", "*.TBD"))
-    t1name = [x.split('/')[-1] for x in s1]
-    t2 = glob(os.path.join(outDir, "Raw", "*.tbd"))
-    t2name = [x.split('/')[-1] for x in s2]
-    if len(t1) + len(t2) != nTBD:
-        if verbose:
-            print(f"Found {len(t1) + len(t2)} tbd files in Raw, but " +
-                  f"detected {nSBD} files in total... will copy new files.")
-        for sdir in sbdDirs:
-            for root, _, files in os.walk(sdir):
-                for filename in files:
-                    if os.path.splitext(filename)[1] in [".TBD", ".tbd"]:
-                        if (filename not in t1name) & (filename not in t2name):
-                            shutil.copyfile(os.path.join(root, filename),
-                                            os.path.join(outDir, "Raw",
-                                                         filename))
-
-    c1 = glob(os.path.join(outDir, "Raw", "Cache", "*.CAC"))
-    c1name = [x.split('/')[-1] for x in c1]
-    c2 = glob(os.path.join(outDir, "Raw", "Cache", "*.cac"))
-    c2name = [x.split('/')[-1] for x in c2]
-    if len(c1)+len(c2) != nCAC:
-        if verbose:
-            print(f"Found {len(c1) + len(c2)} cache files in Raw, but " +
-                  f"detected {nCAC} files in total... will copy new files.")
-        for cdir in cacDirs:
-            for root, _, files in os.walk(cdir):
-                for filename in files:
-                    if os.path.splitext(filename)[1] in [".CAC", ".cac"]:
-                        if (filename not in c1name) & (filename not in c2name):
-                            shutil.copyfile(os.path.join(root, filename),
-                                            os.path.join(outDir, "Raw",
-                                                         "Cache", filename))
-    # Rename all files to have full filenames from metadata...
-    for root, _, files in os.walk(os.path.join(outDir, "Raw")):
-        for filename in files:
-            path, ext = os.path.splitext(filename)
-            if ext in [".ebd", ".dbd", ".EBD", ".DBD", ".sbd", ".SBD",
-                       ".tbd", ".TBD"]:
+    # RENAME, COPY *BD files to outdir
+    # Walk through data dirs, get list of filenames...
+    ext = ['e', 'd', 's', 't']
+    extdirs = [ebddirs, dbddirs, sbddirs, tbddirs]
+    for e, temdirs in zip(ext, extdirs):
+        for bdd in temdirs:
+            oldnames = []
+            [oldnames.append(x) for x in
+                set.union(set([x.split('/')[-1] for x in
+                               glob(os.path.join(bdd, "*." + e.upper() +
+                                                 "BD"))]),
+                          set([x.split('/')[-1] for x in
+                               glob(os.path.join(bdd, "*." + e.lower() +
+                                                 "bd"))]))]
+            # Load metadata, get converted name, copy file to rawdir
+            for name in oldnames:
                 try:
-                    meta = slocum.dbd_get_meta(os.path.join(root, filename),
-                                               cachedir=os.path.join(root,
-                                                                     "Cache"))
-                    print("Meta got loaded...")
-                    newname = meta[0]['full_filename']
-                    shutil.copyfile(os.path.join(root, filename),
-                                    os.path.join(root, newname + ext.lower()))
-                    print(f"Removing {filename}...")
-                    os.remove(os.path.join(root, filename))
+                    meta = slocum.dbd_get_meta(
+                        os.path.join(bdd, name), cachedir=cachedir)
+                    newname = meta[0]['full_filename'] + "." + e + "bd"
+                    print(f"New name for {name}: {newname}. Copying...")
+                    shutil.copyfile(os.path.join(bdd, name),
+                                    os.path.join(rawdir, newname))
                 except Exception:
-                    e = sys.exc_info()[0]
-                    print(f"Error: {e}")
-                    print(f"Cannot load metadata for file {filename}")
-                    print("Moving on to next file...")
-
-    if verbose:
-        print("Raw directory exists, and any new EBD/DBD/SBD/TBD/cache files" +
-              " have been copied over and re-named.")
+                    err = sys.exc_info()[0]
+                    print(f"Error: {err}")
+                    print(f"Cannot load metadata for file {name}")
+                    print("Not copying to kiwi/raw/")
 
 
-def _setupcheck(rootDir: str, verbose: bool = True) -> tuple:
+def _get_dirs(rootdir: str, ext: str) -> tuple:
+    """Function to recursive search if directory has files with extension.
+
+    _get_dirs(rootdir: str, ext: str) -> list
+
+    Parameters
+    -----------
+        rootdir : string
+            Directory which contains raw *.BD files within it. Removes "Raw"
+            dir from the list at the end, since this should indicate outdir ==
+            rootdir
+        ext     : string
+            File extension to search for, slocum glider use case is for *BD"
+
+    Returns a tuple containing the number of files found and the list of
+    directories that have files with given extension.
+    """
+    out = []
+    nfiles = 0
+    upp = ext.upper()
+    low = ext.lower()
+    for root, _, files in os.walk(rootdir):
+        for filename in files:
+            if os.path.splitext(filename)[1] in ["." + upp, "." + low]:
+                nfiles += 1
+                if root not in out:
+                    out.append(root)
+    # Check to see if "Raw and Raw/Cache/ are in the list..."
+    removelist = [os.path.join(rootdir, "Kiwi", "Raw"),
+                  os.path.join(rootdir, "Kiwi", "Raw", "Cache")]
+    for dname in removelist:
+        if dname in out:
+            out.remove(dname)
+
+    return (nfiles, out)
+
+
+def _setupcheck(rootdir: str) -> tuple:
     """
     function setupcheck(rootDir, verbose)
+    Double-checks that user-provided directory is a valid setup
+    for kiwiglider package. Returns tuple with raw and cache paths.
 
-    Input:
-        rootDir - Path to root processing directory
-        verbose - Logical switch to print detailed status.
+    Parameters
+    ----------
+    rootdir     : str
+        String that has path of kiwiglider directory.
 
     Output:
+    tuple with rawdir and cachedir directories for use in further processing
 
-    Description:
-        Function invoked at beginning of steps to double-check that the
-        user-provided directory is a good root directory for processing
-        as defined in kiwiglider. Returns tuple with raw and cache paths.
     """
     import os
-    if not os.path.exists(os.path.join(rootDir, "Raw")):
-        raise Exception(f"Now Raw directory in {rootDir}, either " +
-                        "directory or run step_00 first.")
+    if not os.path.exists(os.path.join(rootdir, "Kiwi", "Raw")):
+        raise Exception(f"No Kiwi/Raw/ directory in {rootdir}, either " +
+                        "correct directory or run setup() first.")
     else:
-        rawDir = os.path.join(rootDir, "Raw")
-    if not os.path.exists(os.path.join(rawDir, "Cache")):
-        raise Exception("Raw directory found, but not Cache. " +
-                        "Please re-run step_00")
+        rawdir = os.path.join(rootdir, "Raw")
+    if not os.path.exists(os.path.join(rawdir, "Cache")):
+        raise Exception("Kiwi/Raw/ directory found, but not Cache. " +
+                        "Please re-run setup()")
     else:
-        cacheDir = os.path.join(rawDir, "Cache")
-    return (rawDir, cacheDir)
+        cachedir = os.path.join(rawdir, "Cache")
+    return (rawdir, cachedir)
