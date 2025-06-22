@@ -873,7 +873,7 @@ class DeploymentYAML():
             # if given a sheet to read
             if self.excelsheet is not None:
                 # get metadata
-                self.add_excel_metadata(self.excelsheet, self.ID)
+                self.add_excel_metadata(self.excelsheet)
             # no sheet to read
             else:
                 # stop running
