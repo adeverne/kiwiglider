@@ -87,6 +87,7 @@ def create_deployment_summary(
         author: str = 'Anonymous',
         extra_text: str = '',
         map_bounds: list[float] = None,
+        time_bounds: list[str] = None,
         globe_position: str = 'BL',
         plots: tuple[dict[str, str]] = (
             {'source': 'temperature',
@@ -113,11 +114,14 @@ def create_deployment_summary(
     extra_text : str, optional
         Any text to add on the same line as funding acknowledgement
         (ex. glider faults during the mission).
-    map_bounds : list or None, optional
+    map_bounds : list[float], optional
         Map bounds in form
         [minimum latitude, maximum latitude,
         minimum longitude, maximum longitude].
-        Specify None to define based on data.
+        Specify None (default) to define based on data.
+    time_bounds : list[str], optional
+        Time bounds in form [minimum time, maximum time]
+        Specify None (default) to define based on data.
     globe_position : str, optional
         Position on map for overview globe. Use codes in terms of
         (T)op, (M)iddle, (B)ottom and
@@ -140,6 +144,12 @@ def create_deployment_summary(
              f'{metadata['deployment_name']} - {metadata['project']}')
     date = datetime.today().strftime('%d %B, %Y')
     extra_text = f'{metadata['acknowledgement']}. {extra_text}'
+
+    # trim time if requested
+    if time_bounds is not None:
+        data = data.sel(
+            time=slice(np.datetime64(time_bounds[0]),np.datetime64(time_bounds[1]))
+        )
 
     # #create "snapshot": text table of select metadata
     # start/end location
@@ -359,7 +369,8 @@ def create_deployment_summary(
         fig.plot(
             x=[max_lon, max_lon, min_lon],
             y=[min_lat, max_lat, max_lat],
-            close=f'+x{min_lon}+y{min_lat}+pthin,red'
+            close=f'+x{min_lon}+y{min_lat}+pthin,red',
+            straight_line='x'
         )
     # metadata text box
     _log.info('Adding metadata snapshot to summary page')

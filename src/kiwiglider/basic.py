@@ -1174,8 +1174,8 @@ class DeploymentNetCDF():
 
     def make_L0(
             self,
-            l0timeseries_directory: str = 'L0-timeseries',
-            l0profile_directory: str | bool | None = 'L0-profiles'
+            timeseries_directory: str = 'L0-timeseries',
+            profile_directory: str | bool | None = 'L0-profiles'
     ) -> None:
         """Create L0 (read and interpolated) timeseries and profile NetCDFs.
 
@@ -1185,10 +1185,10 @@ class DeploymentNetCDF():
 
         Parameters
         ----------
-        l0timeseries_directory : str, optional
+        timeseries_directory : str, optional
             Path, relative to class's main_directory and style,
             to the directory to put the L0 timeseries NetCDFs
-        l0profile_directory : str, optional
+        profile_directory : str, optional
             Path, relative to class's main_directory and style,
             to the directory to put the L0 profile NetCDFs.
             Specify None or False to skip writing profile NetCDFs
@@ -1208,14 +1208,14 @@ class DeploymentNetCDF():
                 raise ValueError('Input "style" must be "realtime", ' +
                                  '"delayed", or None')
         self.l0timeseries_directory = join_path(
-            self.main_directory, self.style, l0timeseries_directory
+            self.main_directory, self.style, timeseries_directory
         )
-        if l0profile_directory:
+        if profile_directory:
             self.l0profile_directory = join_path(
-                self.main_directory, self.style, l0profile_directory
+                self.main_directory, self.style, profile_directory
             )
         else:
-            self.l0profile_directory = l0profile_directory
+            self.l0profile_directory = profile_directory
 
         # turn binary *.*bd (file extension based on search) into a single
         # timeseries netcdf file
@@ -1240,8 +1240,8 @@ class DeploymentNetCDF():
 
     def make_L1(
             self,
-            l1timeseries_directory: str = 'L1-timeseries',
-            l1profile_directory: str | bool | None = 'L1-profiles'
+            timeseries_directory: str = 'L1-timeseries',
+            profile_directory: str | bool | None = 'L1-profiles'
     ) -> None:
         """Create the L1 (QARTOD tested) timeseries and profile NetCDFs.
 
@@ -1251,10 +1251,10 @@ class DeploymentNetCDF():
 
         Parameters
         ----------
-        l1timeseries_directory : str, optional
+        timeseries_directory : str, optional
             Path, relative to class's main_directory and style,
             to the directory to put the L1 timeseries NetCDFs
-        l1profile_directory : str, optional
+        profile_directory : str, optional
             Path, relative to class's main_directory and style,
             to the directory to put the L1 profile NetCDFs.
             Specify None or False to skip writing profile NetCDFs
@@ -1269,14 +1269,14 @@ class DeploymentNetCDF():
 
         # assign inputs
         self.l1timeseries_directory = join_path(
-            self.main_directory, self.style, l1timeseries_directory
+            self.main_directory, self.style, timeseries_directory
         )
-        if l1profile_directory:
+        if profile_directory:
             self.l1profile_directory = join_path(
-                self.main_directory, self.style, l1profile_directory
+                self.main_directory, self.style, profile_directory
             )
         else:
-            self.l1profile_directory = l1profile_directory
+            self.l1profile_directory = profile_directory
 
         # make sure output directory exists
         if not exists(self.l1timeseries_directory):
