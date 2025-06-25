@@ -42,7 +42,7 @@ backscatter_630:
 'sci_bb3sloV3_b630_scaled'
 
 backscatter_650:
-'sci_bb2flsV7_b532_scaled'
+'sci_bb2flsV7_b650_scaled'
 
 backscatter_660:
 'sci_bb2c_beta660_eng_units'

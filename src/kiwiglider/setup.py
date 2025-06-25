@@ -9,7 +9,7 @@ import os
 from glob import glob
 import shutil
 import sys
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 import logging
 from pyglider import slocum
 
@@ -18,28 +18,28 @@ _log = logging.getLogger(__name__)
 
 def setup(rootdir: str, outdir: str = None, startdate: float = None,
           enddate: float = None) -> None:
-    """ Master function that creates processing directory with copied and
+    """ Function that creates processing directory with copied and
         renamed raw data files and cache files.
 
-    setup(rootDir: str, outDir: str = None, startDate: float = None,
-          endDate: float = None, verbose: bool = True) -> None
+    setup(rootdir: str, outdir: str = None, startdate: float = None,
+          enddate: float = None, verbose: bool = True) -> None
 
     Parameters
     -----------
-        rootDir : string
+        rootdir : string
             Directory with raw EBD/DBD/SBD/TBD/CAC files for processing.
-        outDir  : string
+        outdir  : string
             Directory to which the subdirectory "Kiwi/Raw" will be created and
             copies of raw data and cache files to be sent.
-        startDate : float, default = None
+        startdate : float, default = None
             POSIX timestamp (i.e. seconds since 1970-01-01Z00:00:00) indicating
             start of deployment.
-        endDate : float, default = None
+        enddate : float, default = None
             POSIX timestamp (i.e. seconds since 1970-01-01Z00:00:00) indicating
             end of glider deployment.
     """
     _log.info("Initiated setup of Kiwiglider at %s",
-              datetime.strftime(datetime.now(tz=UTC),
+              datetime.strftime(datetime.now(timezone.utc),
                                 "%Y-5m-%d %H:%M:%S"))
 
     # INITIAL CHECKS
@@ -209,7 +209,7 @@ def _setupcheck(rootdir: str) -> tuple:
         raise Exception(f"No Kiwi/Raw/ directory in {rootdir}, either " +
                         "correct directory or run setup() first.")
     else:
-        rawdir = os.path.join(rootdir, "Raw")
+        rawdir = os.path.join(rootdir, "Kiwi", "Raw")
     if not os.path.exists(os.path.join(rawdir, "Cache")):
         raise Exception("Kiwi/Raw/ directory found, but not Cache. " +
                         "Please re-run setup()")

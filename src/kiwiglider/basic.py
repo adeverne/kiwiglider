@@ -260,7 +260,7 @@ class DeploymentYAML():
             self._add_glider_device('optics2', {
                 'make': 'SeaBird',
                 'model': self.excel_metadata['bb3_type'],
-                'serial': f'{self.excel_metadata['bb3_sn']}',
+                'serial': f"{self.excel_metadata['bb3_sn']}",
                 'factory_calibrated':
                 self.excel_metadata['bb3_cal'].strftime('%Y-%m-%d'),
                 'calibration_date':
@@ -272,7 +272,7 @@ class DeploymentYAML():
             self._add_glider_device('lisst', {
                 'make': 'Sequoia',
                 'model': self.excel_metadata['lisst_type'],
-                'serial': f'{self.excel_metadata['lisst_sn']}',
+                'serial': f"{self.excel_metadata['lisst_sn']}",
                 'factory_calibrated':
                 self.excel_metadata['lisst_cal'].strftime('%Y-%m-%d'),
                 'calibration_date':
@@ -284,7 +284,7 @@ class DeploymentYAML():
             self._add_glider_device('microrider', {
                 'make': 'Rockland',
                 'model': self.excel_metadata['microrider_type'],
-                'serial': f'{self.excel_metadata['microrider_sn']}',
+                'serial': f"{self.excel_metadata['microrider_sn']}",
                 'factory_calibrated':
                 self.excel_metadata['microrider_cal'].strftime('%Y-%m-%d'),
                 'calibration_date':
@@ -724,7 +724,7 @@ class DeploymentYAML():
                 'make_model': 'Seabird ' +
                 self.excel_metadata['ctd_type'],
                 'platform': 'platform',
-                'serial_number': f'{self.excel_metadata['ctd_sn']}',
+                'serial_number': f"{self.excel_metadata['ctd_sn']}",
                 'type': 'platform',
                 '_FillValue': -999.0
             },

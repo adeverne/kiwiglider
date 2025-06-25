@@ -29,6 +29,7 @@ dbd = [
 ]
 plot = [
     "pygmt",
+    "utm",
     "cmocean",
     "matplotlib",
     "palettable",
