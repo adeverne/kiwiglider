@@ -133,14 +133,14 @@ def step_01(rootdir: str, start_date: float = None,
         # We've loaded all the machine variables, create Xarray and save to
         # intermediate netCDF file.
         datavardict = ','.join([f'{x}=(["time"],{x})' for x in machinelist])
-        datavar = exec(f"dict({datavardict})")
-        machineXr = xr.Dataset(data_vars=datavar,
+        exec(f"datavar = dict({datavardict})")
+        machinexr = xr.Dataset(data_vars=datavar,
                                coords=dict(time=machinetime),
                                attrs=dict(description="Intermediate file " +
                                           "storing machine variables.",
                                           timeunits="seconds since 1970-01-" +
-                                          "01Z00:00:00"))
-        machineXr.to_netcdf(os.path.join(rootdir, "Kiwi", "temp_Machine.nc"))
+                                          "01T00:00:00Z"))
+        machinexr.to_netcdf(os.path.join(rootdir, "Kiwi", "temp_Machine.nc"))
     else:
         print("Reading dbd files using pyglider, will take some time.")
         nfiles = len(dlist)
@@ -167,16 +167,18 @@ def step_01(rootdir: str, start_date: float = None,
             exec(f"{mvar} = {mvar}[indsort]")
         datavardict = ','.join([f'{x}=(["time"],{x})' for x in machinelist])
         exec(f"datavar = dict({datavardict})")
-        machineXr = xr.Dataset(data_vars=datavar,
-                               coords = dict(time=machinetime),
+        #datavar = exec(f"dict({datavardict})")
+        machinexr = xr.Dataset(data_vars=datavar,
+                               coords=dict(time=machinetime),
                                attrs=dict(description="Intermediate file " +
-                               "storing machine variables.",
-                               timeunits="seconds since 1970-01-" +
-                               "01Z00:00:00"))
-        machineXr.to_netcdf(os.path.join(rootdir, "Kiwi", "temp_Science.nc"))
+                                          "storing machine variables.",
+                                          timeunits="seconds since 1970-01-" +
+                                          "01Z00:00:00"))
+        machinexr.to_netcdf(os.path.join(rootdir, "Kiwi", "temp_Science.nc"))
 
     # Science variables
     scivarnames = []
+    externaldevice = False
     # Search for CTD variables...
     print("Searching for CTD variables...")
     # Pressure
@@ -236,7 +238,6 @@ def step_01(rootdir: str, start_date: float = None,
             print(f"Found backscatter (generic) variable: {vname}")
             numback += 1
             scivarnames.append(vname)
-    print(f"Found {numback:02d} backscatter variables.")
     # Backscatter 412
     if 'sci_bb2flsV4_b412_scaled' in vardict.keys():
         print("Found backscatter (412nm)")
@@ -349,7 +350,7 @@ def step_01(rootdir: str, start_date: float = None,
         scivarnames.append(nitratename)
     # Oxygen
     for vname in ['sci_oxy3835_oxygen', 'sci_oxy3835_wphase_oxygen',
-                  'sci_oy4_oxygen', 'sci_rinkoII_DO']:
+                  'sci_oxy4_oxygen', 'sci_rinkoII_DO']:
         if vname in vardict.keys():
             print("Found oxygen")
             oxyname = vname
@@ -386,36 +387,76 @@ def step_01(rootdir: str, start_date: float = None,
     print("Done searching for science variables.")
     if externaldevice:
         print("Found external device (e.g. microrider, lisst), make sure " +
-              "to downlaod data separately from the device.")
+              "to download data separately from the device.")
     print("Will load the following science variables...")
     for ind, name in enumerate(scivarnames):
-        print(f"{ind:03d}: {name}")
+        print(f"{ind:03d}: {name}, raw unit: {vardict[name]}")
 
-    #if have_dbd:
-
-    #else:
-
-#        # Now go through science and see if we can find the usual suspects...
-#
-#        for mName in machineList:
-#            if np.where([x == mName for x in varList])[0].size > 0:
-#                if verbose:
-#                    print("Found variable {mName} in list, trying to load...")
-#                try:
-#                    varTime, varVal = mDBD.get(mName)
-#                except DbdError:
-#                    print("Could not load {mName}...")
-#                exec(f"{mName} = np.zeros((ntimeStamps,))*np.nan")
-#                timeIdx = np.squeeze(np.asarray([np.where(mTimeStamps == x)[0]
-#                                                for x in varTime]))
-#                exec(f"{mName}[timeIdx] = varVal")
-#                # Create Xarray DataArray from variable
-#                exec(f"{mName}_DA = xr.DataArray({mName}," +
-#                     "dims=['time'],coords=dict(time=mTimeStamps)," +
-#                     f"attrs=dict(long_name='{machineName}'," +
-#                     f"units='{machineUnits}',_FillValue='')")
-#            else:
-#                raise Exception("Did not find {mName} in found variables...")
+    if have_dbd:
+        # grab sci_m_present_time, then create empty variables for rest of
+        # science variables before filling them...
+        temtime, sciencetime = mDBD.get('sci_m_present_time')
+        if np.nansum(temtime == sciencetime) != len(temtime):
+            raise Exception("dbdreader returned time and sci_m_present time" +
+                            " do not match...")
+        del temtime
+        nTmach = len(sciencetime)
+        sciencetime = np.sort(sciencetime)
+        for svar in scivarnames:
+            if svar not in vardict.keys():
+                raise Exception(f"Did not find science variabes {svar}...")
+            print(f"Working on variable {svar}...")
+            svartime, svarvals = mDBD.get(svar)
+            ord = np.zeros((svartime.shape), dtype=int)
+            for ind, x in enumerate(svartime):
+                ord[ind] = np.where(sciencetime == x)[0][0]
+            exec(f"{svar} = np.ones(({nTmach},))*np.nan")
+            exec(f"{svar}[ord] = svarvals")
+            del svartime, svarvals, ord
+        # Loaded all science variables, create Xarray and save to intermediate
+        # netCDF file...
+        datavardict = ','.join([f'{x}=(["time"],{x})' for x in scivarnames])
+        exec(f"datavar = dict({datavardict})")
+        sciencexr = xr.Dataset(data_vars=datavar,
+                               coords=dict(time=sciencetime),
+                               attrs=dict(description="Intermediate file " +
+                                          "storing machine variables.",
+                                          timeunits="seconds since 1970-01-" +
+                                          "01T00:00:00Z"))
+        sciencexr.to_netcdf(os.path.join(rootdir, "Kiwi", "temp_Science.nc"))
+    else:
+        print("Reading ebd files using pyglider, will take some time.")
+        nfiles = len(elist)
+        for ind, efile in enumerate(elist):
+            temdat = slocum.dbd_to_dict(efile, cachedir=cachedir)
+            if ind == 0:
+                sciencetime = temdat[0]['sci_m_present_time'][:]
+                for svar in scivarnames:
+                    if svar not in vardict.keys():
+                        raise Exception("Did not find machine " +
+                                        f"variable {svar}...")
+                    exec(f"{svar} = temdat[0]['{svar}'][:]")
+            else:
+                sciencetime = np.concatenate((sciencetime,
+                                              temdat[0]['sci_m_present_time'][:]))
+                for svar in scivarnames:
+                    exec(f"{svar} = np.concatenate(({svar}, " +
+                         f"temdat[0]['{svar}'][:]))")
+            print(f"Done with file #{ind+1:02d} out of {nfiles}...")
+        # Sort arrays, then create xarray to save netCDF file...
+        indsort = np.argsort(sciencetime)
+        sciencetime = sciencetime[indsort]
+        for svar in scivarnames:
+            exec(f"{svar} = {svar}[indsort]")
+        datavardict = ','.join([f'{x}=(["time"],{x})' for x in scivarnames])
+        exec(f"datavar = dict({datavardict})")
+        machinexr = xr.Dataset(data_vars=datavar,
+                               coords=dict(time=sciencetime),
+                               attrs=dict(description="Intermediate file " +
+                                          "storing machine variables.",
+                                          timeunits="seconds since 1970-01-" +
+                                          "01Z00:00:00"))
+        machinexr.to_netcdf(os.path.join(rootdir, "Kiwi", "temp_Science.nc"))
 
 
 def step02telemetry(verbose: bool = True):
