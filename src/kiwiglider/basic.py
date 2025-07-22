@@ -2,6 +2,7 @@
 from os.path import join as join_path
 from os.path import basename, exists
 from os import makedirs, listdir
+import re
 from itertools import groupby
 import yaml
 import logging
@@ -30,11 +31,15 @@ class DeploymentYAML():
     ----------
     ID : int, default = 1
         Deployment number/ID to focus on
+    style : str, default = 'Realtime'
+        Deployment processing type, either 'Realtime' or 'Delayed'
 
     Attributes
     ----------
     ID : int
         Deployment number/ID to focus on
+    style : str
+        Deployment processing type
     excelsheet : str
         Path to Excel sheet with metadata
     excel_metadata : dict[str, list[str | int | float]]
@@ -56,8 +61,9 @@ class DeploymentYAML():
 
     """
 
-    def __init__(self, ID: int = 1):
+    def __init__(self, ID: int = 1, style: str = 'Realtime'):
         self.ID = ID
+        self.style = style
 
     def add_excel_metadata(self, excelsheet: str) -> None:
         """Add Excel sheet metadata for given deployment ID.
@@ -206,11 +212,12 @@ class DeploymentYAML():
                 'serial': f'{self.excel_metadata['pres_sn']}'
             },
             'ctd': {
-                'make': 'Seabird',
+                'make': self.excel_metadata['ctd_make'],
                 'model': self.excel_metadata['ctd_type'],
                 'serial': f'{self.excel_metadata['ctd_sn']}',
                 'long_name': 'Seabird SlocumCTD',
-                'make_model': 'Seabird SlocumCTD',
+                'make_model': self.excel_metadata['ctd_make'] + ' ' 
+                + self.excel_metadata['ctd_type'],
                 'factory_calibrated': '" "',
                 'calibration_date':
                 self.excel_metadata['ctd_cal'].strftime('%Y-%m-%d'),
@@ -220,21 +227,21 @@ class DeploymentYAML():
         }
 
         # add based on devices present in Excel worksheet metadata
-        if self.excel_metadata['wetlabs_installed']:
+        if self.excel_metadata['puck_installed']:
             self._add_glider_device('optics', {
-                'make': 'Wetlabs',
-                'model': self.excel_metadata['wetlabs_type'],
-                'serial': f'{self.excel_metadata['wetlabs_sn']}',
+                'make': self.excel_metadata['puck_make'],
+                'model': self.excel_metadata['puck_type'],
+                'serial': f'{self.excel_metadata['puck_sn']}',
                 'factory_calibrated':
-                self.excel_metadata['wetlabs_cal'].strftime('%Y-%m-%d'),
+                self.excel_metadata['puck_cal'].strftime('%Y-%m-%d'),
                 'calibration_date':
-                self.excel_metadata['wetlabs_cal'].strftime('%Y-%m-%d'),
+                self.excel_metadata['puck_cal'].strftime('%Y-%m-%d'),
                 'calibration_report': '" "',
                 'comment': '" "'
             })
         if self.excel_metadata['oxy_installed']:
             self._add_glider_device('oxygen', {
-                'make': 'AADI',
+                'make': self.excel_metadata['oxy_make'],
                 'model': self.excel_metadata['oxy_type'],
                 'serial': f'{self.excel_metadata['oxy_sn']}',
                 'factory_calibrated':
@@ -246,7 +253,7 @@ class DeploymentYAML():
             })
         if self.excel_metadata['par_installed']:
             self._add_glider_device('par', {
-                'make': 'Biospherical',
+                'make': self.excel_metadata['par_make'],
                 'model': self.excel_metadata['par_type'],
                 'serial': f'{self.excel_metadata['par_sn']}',
                 'factory_calibrated':
@@ -258,7 +265,7 @@ class DeploymentYAML():
             })
         if self.excel_metadata['bb3_installed']:
             self._add_glider_device('optics2', {
-                'make': 'SeaBird',
+                'make': self.excel_metadata['bb3_make'],
                 'model': self.excel_metadata['bb3_type'],
                 'serial': f"{self.excel_metadata['bb3_sn']}",
                 'factory_calibrated':
@@ -270,7 +277,7 @@ class DeploymentYAML():
             })
         if self.excel_metadata['lisst_installed']:
             self._add_glider_device('lisst', {
-                'make': 'Sequoia',
+                'make': self.excel_metadata['lisst_make'],
                 'model': self.excel_metadata['lisst_type'],
                 'serial': f"{self.excel_metadata['lisst_sn']}",
                 'factory_calibrated':
@@ -282,7 +289,7 @@ class DeploymentYAML():
             })
         if self.excel_metadata['microrider_installed']:
             self._add_glider_device('microrider', {
-                'make': 'Rockland',
+                'make': self.excel_metadata['microrider_make'],
                 'model': self.excel_metadata['microrider_type'],
                 'serial': f"{self.excel_metadata['microrider_sn']}",
                 'factory_calibrated':
@@ -381,13 +388,13 @@ class DeploymentYAML():
                 'standard_name': 'sea_water_electrical_conductivity',
                 'units': 'S m-1',
                 'instrument': 'instrument_ctd',
-                'valid_min': 0.0,
-                'valid_max': 10.0,
+                'valid_min': self.excel_metadata['ctd_c_minimum'],
+                'valid_max': self.excel_metadata['ctd_c_maximum'],
                 '_FillValue': -999.0,
                 'observation_type': 'measured',
-                'accuracy': 0.0003,
-                'precision': 0.0001,
-                'resolution': 0.00002
+                'accuracy': self.excel_metadata['ctd_c_accuracy'],
+                'precision': self.excel_metadata['ctd_c_precision'],
+                'resolution': self.excel_metadata['ctd_c_resolution']
             },
             'temperature': {
                 'source': 'sci_water_temp',
@@ -395,13 +402,13 @@ class DeploymentYAML():
                 'standard_name': 'sea_water_temperature',
                 'units': 'Celsius',
                 'instrument': 'instrument_ctd',
-                'valid_min': -5.0,
-                'valid_max': 50.0,
+                'valid_min': self.excel_metadata['ctd_t_minimum'],
+                'valid_max': self.excel_metadata['ctd_t_maximum'],
                 '_FillValue': -999.0,
                 'observation_type': 'measured',
-                'accuracy': 0.002,
-                'precision': 0.001,
-                'resolution': 0.0002
+                'accuracy': self.excel_metadata['ctd_t_accuracy'],
+                'precision': self.excel_metadata['ctd_t_precision'],
+                'resolution': self.excel_metadata['ctd_t_resolution']
             },
             'pressure': {
                 'source': 'sci_water_pressure',
@@ -409,16 +416,16 @@ class DeploymentYAML():
                 'standard_name': 'sea_water_pressure',
                 'units': 'dbar',
                 'conversion': 'bar2dbar',
-                'valid_min': 0.0,
-                'valid_max': 2000.0,
-                '_FillValue': -999.0,
                 'positive': 'down',
                 'reference_datum': 'sea-surface',
                 'instrument': 'instrument_ctd',
+                'valid_min': self.excel_metadata['ctd_p_minimum'],
+                'valid_max': self.excel_metadata['ctd_p_maximum'],
+                '_FillValue': -999.0,
                 'observation_type': 'measured',
-                'accuracy': 1.0,
-                'precision': 2.0,
-                'resolution': 0.02,
+                'accuracy': self.excel_metadata['ctd_p_accuracy'],
+                'precision': self.excel_metadata['ctd_p_precision'],
+                'resolution': self.excel_metadata['ctd_p_resolution'],
                 'comment': 'ctd pressure sensor'
             },
             'water_velocity_eastward': {
@@ -438,34 +445,34 @@ class DeploymentYAML():
         }
 
         # add based on devices present in Excel worksheet metadata
-        if self.excel_metadata['wetlabs_installed']:
+        if self.excel_metadata['puck_installed']:
             self._add_netcdf_variable('chlorophyll', {
                 'source': 'sci_flbbcd_chlor_units',
                 'long_name': 'Chlorophyll',
                 'standard_name': 'concentration_of_chlorophyll_in_sea_water',
                 'units': 'mg m-3',
-                'valid_min': 0.0,
-                'valid_max': 50.0,
+                'valid_min': self.excel_metadata['puck_chlor_minimum'],
+                'valid_max': self.excel_metadata['puck_chlor_maximum'],
                 '_FillValue': -999.0,
-                'resolution': 0.007
+                'resolution': self.excel_metadata['puck_chlor_resolution']
             })
             self._add_netcdf_variable('cdom', {
                 'source': 'sci_flbbcd_cdom_units',
                 'long_name': 'Colored Dissolved Organic Matter',
                 'units': 'ppb',
-                'valid_min': 0.0,
-                'valid_max': 375.0,
+                'valid_min': self.excel_metadata['puck_cdom_minimum'],
+                'valid_max': self.excel_metadata['puck_cdom_maximum'],
                 '_FillValue': -999.0,
-                'resolution': 0.08
+                'resolution': self.excel_metadata['puck_cdom_resolution']
             })
             self._add_netcdf_variable('backscatter_700', {
                 'source': 'sci_flbbcd_bb_units',
                 'long_name': '700 nm Wavelength Backscatter',
                 'units': "1",
-                'valid_min': 0.0,
-                'valid_max': 5.0,
+                'valid_min': self.excel_metadata['puck_back_minimum'],
+                'valid_max': self.excel_metadata['puck_back_maximum'],
                 '_FillValue': -999.0,
-                'resolution': 0.000002
+                'resolution': self.excel_metadata['puck_back_resolution']
             })
         if self.excel_metadata['oxy_installed']:
             self._add_netcdf_variable('oxygen_concentration', {
@@ -474,11 +481,11 @@ class DeploymentYAML():
                 'standard_name': 'mole_concentration_of_dissolved_' +
                                  'molecular_oxygen_in_sea_water',
                 'units': 'umol l-1',
-                'valid_min': 0.0,
-                'valid_max': 500.0,
+                'valid_min': self.excel_metadata['oxy_minimum'],
+                'valid_max': self.excel_metadata['oxy_maximum'],
                 '_FillValue': -999.0,
-                'accuracy': 8.0,
-                'resolution': 1.0
+                'accuracy': self.excel_metadata['oxy_accuracy'],
+                'resolution': self.excel_metadata['oxy_resolution']
             })
         if self.excel_metadata['par_installed']:
             self._add_netcdf_variable('par', {
@@ -487,8 +494,8 @@ class DeploymentYAML():
                 'standard_name': 'downwelling_photosynthetic_photon_' +
                                  'spherical_irradiance_in_sea_water',
                 'units': 'umol m-2 s-1',
-                'valid_min': 0.0,
-                'valid_max': 6000.0,
+                'valid_min': self.excel_metadata['par_minimum'],
+                'valid_max': self.excel_metadata['par_maximum'],
                 '_FillValue': -999.0
             })
         if self.excel_metadata['bb3_installed']:
@@ -496,55 +503,55 @@ class DeploymentYAML():
                 'source': 'sci_bb3slo_b470_scaled',
                 'long_name': '470 nm Wavelength Backscatter',
                 'units': "1",
-                'valid_min': 0.0,
-                'valid_max': 5.0,
+                'valid_min': self.excel_metadata['bb3_470_minimum'],
+                'valid_max': self.excel_metadata['bb3_470_maximum'],
                 '_FillValue': -999.0,
-                'resolution': 0.00001
+                'resolution': self.excel_metadata['bb3_470_resolution']
             })
             self._add_netcdf_variable('backscatter_532', {
                 'source': 'sci_bb3slo_b532_scaled',
                 'long_name': '532 nm Wavelength Backscatter',
                 'units': "1",
-                'valid_min': 0.0,
-                'valid_max': 5.0,
+                'valid_min': self.excel_metadata['bb3_532_minimum'],
+                'valid_max': self.excel_metadata['bb3_532_maximum'],
                 '_FillValue': -999.0,
-                'resolution': 0.000006
+                'resolution': self.excel_metadata['bb3_532_resolution']
             })
             self._add_netcdf_variable('backscatter_660', {
                 'source': 'sci_bb3slo_b660_scaled',
                 'long_name': '660 nm Wavelength Backscatter',
                 'units': "1",
-                'valid_min': 0.0,
-                'valid_max': 5.0,
+                'valid_min': self.excel_metadata['bb3_660_minimum'],
+                'valid_max': self.excel_metadata['bb3_660_maximum'],
                 '_FillValue': -999.0,
-                'resolution': 0.0000035
+                'resolution': self.excel_metadata['bb3_660_resolution']
             })
         if self.excel_metadata['lisst_installed']:
             self._add_netcdf_variable('total_volume_concentration', {
                 'source': 'sci_lisst_totvol',
                 'long_name': 'Total Volume Concentration of Particles',
                 'units': 'uL L-1',
-                'valid_min': 0.5,
-                'valid_max': 700,
+                'valid_min': self.excel_metadata['lisst_vol_minimum'],
+                'valid_max': self.excel_metadata['lisst_vol_maximum'],
                 '_FillValue': -999.0,
-                'resolution': 0.1
+                'resolution': self.excel_metadata['lisst_vol_resolution']
             })
             self._add_netcdf_variable('mean_size', {
                 'source': 'sci_lisst_meansize',
                 'long_name': 'Mean Particle Size',
                 'units': 'um',
-                'valid_min': 1.0,
-                'valid_max': 500,
+                'valid_min': self.excel_metadata['lisst_sz_minimum'],
+                'valid_max': self.excel_metadata['lisst_sz_maximum'],
                 '_FillValue': -999.0
             })
             self._add_netcdf_variable('beam_attenuation', {
                 'source': 'sci_lisst_beamc',
                 'long_name': 'Beam Attenuation',
                 'units': 'm-1',
-                'valid_min': 0.3,
-                'valid_max': 0.99,
+                'valid_min': self.excel_metadata['lisst_beam_minimum'],
+                'valid_max': self.excel_metadata['lisst_beam_maximum'],
                 '_FillValue': -999.0,
-                'resolution': 0.1
+                'resolution': self.excel_metadata['lisst_beam_resolution']
             })
 
         # add from user input (overwrite as necessary)
@@ -720,8 +727,10 @@ class DeploymentYAML():
                 'calibration_report': '" "',
                 'factory_calibrated':
                 self.excel_metadata['ctd_cal'].strftime('%Y-%m-%dT%H:%M:%SZ'),
-                'long_name': 'Seabird Glider Payload CTD',
-                'make_model': 'Seabird ' +
+                'long_name': self.excel_metadata['ctd_make'] + 
+                ' Glider Payload CTD',
+                'make_model':
+                self.excel_metadata['ctd_make'] + ' ' +
                 self.excel_metadata['ctd_type'],
                 'platform': 'platform',
                 'serial_number': f"{self.excel_metadata['ctd_sn']}",
@@ -738,22 +747,24 @@ class DeploymentYAML():
     def add_qartod_tests(
             self,
             qartod_tests:
-            dict[str, dict[str, dict[str, Any]]] = None
+            dict[str, dict[str, dict[str, Any]]] = None,
+            tbdlist: str = None
     ) -> None:
         """Add QARTOD test parameters
 
         Note
         ----
-        Gross Range Tests use NetCDF variable valid_min, valid_max.
+        Gross Range and Rate of Change Tests use NetCDF variable valid_min, valid_max.
 
-        Spike, Rate of Change, and Flat Line Tests use
-        NetCDF variable resolution.
+        Spike and Flat Line Tests use NetCDF variable resolution and class style.
 
         Parameters
         ----------
         qartod_tests : dict[str, dict[str, dict[str, Any]]], optional
             QARTOD test parameters to overwrite default in form
             {'variable_name': {'test_name': {'parameter_name': value}}}
+        tbdlist : str, optional
+            Path to tbdlist.dat
 
         """
         _log.info('Adding QARTOD test metadata to deployment YAML')
@@ -769,35 +780,65 @@ class DeploymentYAML():
         for variable in self.netcdf_variables:
             if (('valid_min' in self.netcdf_variables[variable]) and
                ('valid_max' in self.netcdf_variables[variable])):
+                # gross range test fails if outside specified manufacturer limits
                 self._add_qartod_test(
                     variable=variable,
                     test='gross_range_test',
-                    parameters={'fail_span':
-                                [self.netcdf_variables[variable]['valid_min'],
-                                 self.netcdf_variables[variable]['valid_max']]
-                                })
-                if 'resolution' in self.netcdf_variables[variable]:
-                    res = self.netcdf_variables[variable]['resolution']
-                    self._add_qartod_test(
-                        variable=variable,
-                        test='spike_test',
-                        parameters={'suspect_threshold':
-                                    res * 100.0,
-                                    'fail_threshold':
-                                    res * 200.0
-                                    })
-                    self._add_qartod_test(
-                        variable=variable,
-                        test='rate_of_change_test',
-                        parameters={'threshold': res * 100.0
-                                    })
-                    self._add_qartod_test(
-                        variable=variable,
-                        test='flat_line_test',
-                        parameters={'suspect_threshold': 150.0,
-                                    'fail_threshold': 300.0,
-                                    'tolerance': res * 2.0
-                                    })
+                    parameters={
+                        'fail_span': [
+                            self.netcdf_variables[variable]['valid_min'],
+                            self.netcdf_variables[variable]['valid_max']
+                        ]
+                    }
+                )
+                # rate of change test suspect if values per second change
+                # more than 100th of the total range
+                self._add_qartod_test(
+                    variable=variable,
+                    test='rate_of_change_test',
+                    parameters={
+                        'threshold': (
+                            self.netcdf_variables[variable]['valid_min'],
+                            self.netcdf_variables[variable]['valid_max']
+                        ) / 100.0
+                    }
+                )
+            if 'resolution' in self.netcdf_variables[variable]:
+                res = self.netcdf_variables[variable]['resolution']
+                # flat line test is suspect[failed] if difference in a 15sec[30sec]
+                # window is less than manufacturer resolution
+                self._add_qartod_test(
+                    variable=variable,
+                    test='flat_line_test',
+                    parameters={
+                        'suspect_threshold': 15.0,
+                        'fail_threshold': 30.0,
+                        'tolerance': res
+                    }
+                )
+                # realtime values are a variable distance apart temporally,
+                # so spike test will often fail even for good values unless buffered
+                # for which we use the interval specified by the user
+                if self.style == 'Realtime':
+                    if tbdlist is not None:
+                        with open(tbdlist,'r') as f:
+                            content = f.read()
+                            deltat = float(re.findall(
+                                self.netcdf_variables[variable]['source'] + r'\s+(\d+)',
+                                content,re.IGNORECASE
+                            )[0])
+                    res *= 2 * deltat
+                # spike test is suspect[failed] if average of surrounding values is more
+                # than 10[20] times the manufacturer resolution (with buffer in Realtime mode)
+                # different than the actual value
+                self._add_qartod_test(
+                    variable=variable,
+                    test='spike_test',
+                    parameters={
+                        'suspect_threshold': res * 10.0,
+                        'fail_threshold': res * 20.0
+                    }
+                )
 
         # add from user input (overwrite as necessary)
         if qartod_tests is not None and type(qartod_tests) is not bool:
