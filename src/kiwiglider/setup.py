@@ -45,7 +45,7 @@ def setup(rootdir: str, outdir: str = None, startdate: float = None,
     # INITIAL CHECKS
     # Check to see if provided rootdir argument exists and not "."
     if os.path.exists(rootdir) & (rootdir != "."):
-        _log.info("Path {rootdir} passes initial test...")
+        _log.info(f"Path {rootdir} passes initial test...")
     else:
         raise ValueError("This path either does not exist, or it is '.'," +
                          " which cannot be used. Please write full path.")
@@ -99,9 +99,9 @@ def setup(rootdir: str, outdir: str = None, startdate: float = None,
     # get pre-existing list of cache files in cacdir, copy new ones.
     cnames = []
     [cnames.append(x) for x in
-        set.union(set([x.split('/')[-1] for x in
+        set.union(set([x.split(os.sep)[-1] for x in
                        glob(os.path.join(cachedir, "*.CAC"))]),
-                  set([x.split('/')[-1] for x in
+                  set([x.split(os.sep)[-1] for x in
                        glob(os.path.join(cachedir, "*.cac"))]))]
     n_cac_exist = len(cnames)
 
@@ -109,9 +109,9 @@ def setup(rootdir: str, outdir: str = None, startdate: float = None,
         for cacd in cacdirs:
             cfiles = []
             [cfiles.append(x) for x in
-                set.union(set([x.split('/')[-1] for x in
+                set.union(set([x.split(os.sep)[-1] for x in
                                glob(os.path.join(cacd, "*.CAC"))]),
-                          set([x.split('/')[-1] for x in
+                          set([x.split(os.sep)[-1] for x in
                                glob(os.path.join(cacd, "*.cac"))]))]
             for cf in cfiles:
                 if cf not in cnames:
@@ -130,10 +130,10 @@ def setup(rootdir: str, outdir: str = None, startdate: float = None,
         for bdd in temdirs:
             oldnames = []
             [oldnames.append(x) for x in
-                set.union(set([x.split('/')[-1] for x in
+                set.union(set([x.split(os.sep)[-1] for x in
                                glob(os.path.join(bdd, "*." + e.upper() +
                                                  "BD"))]),
-                          set([x.split('/')[-1] for x in
+                          set([x.split(os.sep)[-1] for x in
                                glob(os.path.join(bdd, "*." + e.lower() +
                                                  "bd"))]))]
             # Load metadata, get converted name, copy file to rawdir
