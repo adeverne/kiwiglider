@@ -142,9 +142,10 @@ def setup(rootdir: str, outdir: str = None, startdate: float = None,
                     meta = slocum.dbd_get_meta(
                         os.path.join(bdd, name), cachedir=cachedir)
                     newname = meta[0]['full_filename'] + "." + e + "bd"
-                    print(f"New name for {name}: {newname}. Copying...")
-                    shutil.copyfile(os.path.join(bdd, name),
-                                    os.path.join(rawdir, newname))
+                    if not os.path.exists(os.path.join(rawdir, newname)):
+                        print(f"New name for {name}: {newname}. Copying...")
+                        shutil.copyfile(os.path.join(bdd, name),
+                                        os.path.join(rawdir, newname))
                 except Exception:
                     err = sys.exc_info()[0]
                     print(f"Error: {err}")
